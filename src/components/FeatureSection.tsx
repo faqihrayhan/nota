@@ -11,12 +11,11 @@ import {
   Activity, 
   ArrowRight, 
   Sparkles,
-  ChevronRight,
-  Globe
+  ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-  const PILARS = [
+const PILARS = [
   {
     id: "pilar1",
     icon: CreditCard,
@@ -50,7 +49,7 @@ import { motion, AnimatePresence } from "framer-motion";
     color: "text-purple-400",
     bgColor: "bg-purple-400/10",
     borderColor: "border-purple-400/20",
-    href: "/score",
+    href: "#",
     active: false,
   },
 ];
@@ -61,14 +60,13 @@ export function FeatureSection() {
 
   return (
     <section id="how-it-works" className="relative border-t border-ink-line/40 bg-ink-2/30 py-32 overflow-hidden">
-      {/* Background Decorative Mesh */}
       <div className="absolute inset-0 -z-10 opacity-30">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,var(--ink-line)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
       </div>
 
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-16 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-          {/* Left: Headers & Tab Triggers */}
+          {/* Left Column */}
           <div className="flex flex-col">
             <Reveal delay={0.1}>
               <div className="inline-flex items-center gap-2 rounded-full border border-ink-line/40 bg-ink-2/50 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.2em] text-text-muted">
@@ -88,52 +86,49 @@ export function FeatureSection() {
                 {t("features.desc")}
               </p>
             </Reveal>
+
+            {/* Pillar List Card Stack */}
             <div className="mt-12 space-y-3">
               {PILARS.map((p, i) => (
                 <Reveal key={p.id} delay={0.4 + i * 0.1} y={15} width="100%">
                   <button
                     onClick={() => setActiveTab(p)}
                     className={cn(
-                      "group relative grid w-full items-center rounded-2xl border p-5 transition-all duration-300", 
-                      "grid-cols-[auto_1fr_auto] gap-4",
+                      "group relative grid w-full items-center rounded-2xl border p-5 transition-all duration-300 min-h-[5.25rem]",
+                      "grid-cols-[3rem_1fr_1.5rem] gap-4 text-left",
                       activeTab.id === p.id
                         ? "border-accent bg-accent/5 shadow-lg shadow-accent/5"
-                        : "border-ink-line/40 bg-transparent hover:border-ink-line hover:bg-ink-2/50 hover:shadow-sm"
+                        : "border-ink-line/40 bg-transparent hover:border-ink-line hover:bg-ink-2/50"
                     )}
                   >
-                    <div className="flex items-center gap-4">
-                    "flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-300",
-                    activeTab.id === p.id ? "bg-accent border-accent text-white" : cn("bg-ink-3 border-ink-line", p.color)
-                  )}>
-                    <p.icon className="h-5 w-5" />
-                  </div>
-                  <div className="col-start-2 text-left">
-                    <h3 className={cn(
-                      "font-display text-lg font-semibold transition-colors truncate",
-                      activeTab.id === p.id ? "text-text" : "text-text-muted group-hover:text-text"
+                    {/* Icon Tile */}
+                    <div className={cn(
+                      "flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-300 shrink-0",
+                      activeTab.id === p.id ? "bg-accent border-accent text-white" : cn("bg-ink-3 border-ink-line", p.color)
                     )}>
-                      {t(`features.${p.id}.title`)}
-                    </h3>
-                    <span className={cn(
-                      "mt-0.5 block text-[10px] font-mono uppercase tracking-[0.2em] text-accent",
-                      activeTab.id === p.id ? "opacity-100" : "opacity-0"
-                    )}>
-                      {p.active ? `${t("features.core")} ${String(i + 1).padStart(2, "0")}` : t("features.comingSoon")}
-                    </span>
-                  </div>
-                  <ChevronRight className={cn(
-                    "h-4 w-4 justify-self-end text-accent transition-opacity duration-300",
-                    activeTab.id === p.id ? "opacity-100" : "opacity-0"
-                  )} />
-                </button>
-              </Reveal>
-            ))}
+                      <p.icon className="h-5 w-5" />
                     </div>
-                      </div>
+
+                    {/* Text Container */}
+                    <div className="flex flex-col justify-center min-w-0">
+                      <h3 className={cn(
+                        "font-display text-lg font-semibold transition-colors truncate leading-tight",
+                        activeTab.id === p.id ? "text-text" : "text-text-muted group-hover:text-text"
+                      )}>
+                        {t(`features.${p.id}.title`)}
+                      </h3>
+                      <span className={cn(
+                        "mt-1 block text-[10px] font-mono uppercase tracking-[0.2em] text-accent font-medium h-4",
+                        activeTab.id === p.id ? "opacity-100" : "opacity-0"
+                      )}>
+                        {p.active ? `${t("features.core")} ${String(i + 1).padStart(2, "0")}` : t("features.comingSoon")}
+                      </span>
                     </div>
+
+                    {/* Right Chevron */}
                     <ChevronRight className={cn(
-                      "h-5 w-5 transition-all duration-300",
-                      activeTab.id === p.id ? "translate-x-0 opacity-100 text-accent" : "-translate-x-2 opacity-0"
+                      "h-5 w-5 justify-self-end transition-all duration-300",
+                      activeTab.id === p.id ? "opacity-100 text-accent translate-x-0" : "opacity-0 -translate-x-2"
                     )} />
                   </button>
                 </Reveal>
@@ -141,7 +136,7 @@ export function FeatureSection() {
             </div>
           </div>
 
-          {/* Right: Feature Preview Display */}
+          {/* Right Column: Preview */}
           <div className="relative">
             <AnimatePresence mode="wait">
               <motion.div
@@ -152,9 +147,7 @@ export function FeatureSection() {
                 transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 className="relative overflow-hidden rounded-[2.5rem] border border-ink-line/60 bg-ink-2 p-2 shadow-2xl"
               >
-                {/* Visual Content Area */}
                 <div className="aspect-[4/3] w-full overflow-hidden rounded-[2rem] bg-ink relative">
-                   {/* Decorative background for the preview */}
                   <div className={cn("absolute inset-0 opacity-10 blur-[80px]", activeTab.bgColor)} />
                   
                   <div className="relative h-full w-full p-12 flex flex-col justify-center items-center text-center">
@@ -202,7 +195,6 @@ export function FeatureSection() {
                     )}
                   </div>
 
-                  {/* Mock browser chrome UI dots */}
                   <div className="absolute top-6 left-8 flex gap-2">
                     <div className="h-2.5 w-2.5 rounded-full bg-ink-line/60" />
                     <div className="h-2.5 w-2.5 rounded-full bg-ink-line/60" />
@@ -211,10 +203,6 @@ export function FeatureSection() {
                 </div>
               </motion.div>
             </AnimatePresence>
-
-            {/* Floating Orbs */}
-            <div className={cn("absolute -top-12 -right-12 h-64 w-64 rounded-full blur-[100px] -z-10 transition-colors duration-1000", activeTab.bgColor)} />
-            <div className={cn("absolute -bottom-12 -left-12 h-48 w-48 rounded-full blur-[80px] -z-10 transition-colors duration-1000", activeTab.bgColor)} />
           </div>
         </div>
       </div>

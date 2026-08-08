@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { Reveal } from "@/components/Reveal";
-import { cn } from "@/lib/utils";
-import { ChevronDown, HelpCircle } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { HelpCircle } from "lucide-react";
 
 const faqData = [
   { q: "faq.q1", a: "faq.a1" },
@@ -16,11 +13,6 @@ const faqData = [
 
 export function FAQ() {
   const { t } = useLanguage();
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
-  const toggle = (i: number) => {
-    setOpenIndex((prev) => (prev === i ? null : i));
-  };
 
   return (
     <section id="faq" className="relative border-t border-ink-line/40 bg-ink-2/10 py-32 scroll-mt-28">
@@ -47,51 +39,18 @@ export function FAQ() {
         </div>
 
         <div className="mt-16 space-y-4">
-          {faqData.map((item, i) => {
-            const isOpen = openIndex === i;
-            return (
-              <Reveal key={i} delay={0.3 + i * 0.1} y={20}>
-                <div
-                  className={cn(
-                    "overflow-hidden rounded-2xl border transition-all duration-300 backdrop-blur-sm",
-                    isOpen
-                      ? "border-accent/40 bg-ink-2/80 shadow-xl shadow-accent/5"
-                      : "border-ink-line/30 bg-ink/30 hover:border-ink-line/60 hover:bg-ink-2/40"
-                  )}
-                >
-                  <button
-                    onClick={() => toggle(i)}
-                    className="flex w-full items-center justify-between gap-6 p-6 text-left"
-                  >
-                    <span className="font-display text-base font-semibold text-text sm:text-lg">
-                      {t(item.q)}
-                    </span>
-                    <div className={cn(
-                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ink-line/40 transition-transform duration-300",
-                      isOpen && "bg-accent border-accent text-white rotate-180"
-                    )}>
-                      <ChevronDown className="h-4 w-4" />
-                    </div>
-                  </button>
-
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                      >
-                        <p className="px-6 pb-6 text-base leading-relaxed text-text-muted border-t border-ink-line/20 pt-4 mt-1">
-                          {t(item.a)}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </Reveal>
-            );
-          })}
+          {faqData.map((item, i) => (
+            <Reveal key={i} delay={0.3 + i * 0.1} y={20}>
+              <div className="rounded-2xl border border-ink-line/30 bg-ink/30 p-6 backdrop-blur-sm transition-all duration-300 hover:border-ink-line/60">
+                <h3 className="font-display text-lg font-semibold text-text sm:text-xl">
+                  {t(item.q)}
+                </h3>
+                <p className="mt-3 text-base leading-relaxed text-text-muted border-t border-ink-line/20 pt-3">
+                  {t(item.a)}
+                </p>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>
