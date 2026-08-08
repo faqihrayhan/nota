@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const PILARS = [
+  const PILARS = [
   {
     id: "pilar1",
     icon: CreditCard,
@@ -50,7 +50,7 @@ const PILARS = [
     color: "text-purple-400",
     bgColor: "bg-purple-400/10",
     borderColor: "border-purple-400/20",
-    href: "#",
+    href: "/score",
     active: false,
   },
 ];
@@ -89,37 +89,45 @@ export function FeatureSection() {
               </p>
             </Reveal>
 
-            <div className="mt-12 space-y-4">
-              {PILARS.map((p, i) => (
-                <Reveal key={p.id} delay={0.4 + i * 0.1} y={15}>
-                  <button
-                    onClick={() => setActiveTab(p)}
-                    className={cn(
-                      "group relative flex w-full items-center justify-between rounded-2xl border p-5 transition-all duration-300",
-                      activeTab.id === p.id
-                        ? "border-accent bg-accent/5 shadow-lg shadow-accent/5"
-                        : "border-ink-line/40 bg-transparent hover:border-ink-line hover:bg-ink-2/50"
-                    )}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-300",
-                        activeTab.id === p.id ? "bg-accent border-accent text-white" : cn("bg-ink-3 border-ink-line", p.color)
-                      )}>
-                        <p.icon className="h-5 w-5" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className={cn(
-                          "font-display text-lg font-semibold transition-colors",
-                          activeTab.id === p.id ? "text-text" : "text-text-muted group-hover:text-text"
-                        )}>
-                          {t(`features.${p.id}.title`)}
-                        </h3>
-                        {!p.active && (
-                          <span className="mt-0.5 inline-block text-[10px] font-mono uppercase tracking-widest text-accent">
-                            {t("features.tryNow")}
-                          </span>
-                        )}
+            {PILARS.map((p, i) => (
+              <Reveal key={p.id} delay={0.4 + i * 0.1} y={15} width="100%">
+                <button
+                  onClick={() => setActiveTab(p)}
+                  className={cn(
+                    "group relative grid w-full grid-cols-[3rem_1fr_auto] items-center gap-4 rounded-2xl border p-5 transition-all duration-300",
+                    activeTab.id === p.id
+                      ? "border-accent bg-accent/5 shadow-lg shadow-accent/5"
+                      : "border-ink-line/40 bg-transparent hover:border-ink-line hover:bg-ink-2/50"
+                  )}
+                >
+                  <div className="col-start-1">
+                    "flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-300",
+                    activeTab.id === p.id ? "bg-accent border-accent text-white" : cn("bg-ink-3 border-ink-line", p.color)
+                  )}>
+                    <p.icon className="h-5 w-5" />
+                  </div>
+                  <div className="col-start-2 text-left">
+                    <h3 className={cn(
+                      "font-display text-lg font-semibold transition-colors truncate",
+                      activeTab.id === p.id ? "text-text" : "text-text-muted group-hover:text-text"
+                    )}>
+                      {t(`features.${p.id}.title`)}
+                    </h3>
+                    <span className={cn(
+                      "mt-0.5 block text-[10px] font-mono uppercase tracking-[0.2em] text-accent",
+                      activeTab.id === p.id ? "opacity-100" : "opacity-0"
+                    )}>
+                      {p.active ? `${t("features.core")} ${String(i + 1).padStart(2, "0")}` : t("features.comingSoon")}
+                    </span>
+                  </div>
+                  <ChevronRight className={cn(
+                    "h-4 w-4 justify-self-end text-accent transition-opacity duration-300",
+                    activeTab.id === p.id ? "opacity-100" : "opacity-0"
+                  )} />
+                </button>
+              </Reveal>
+            ))}
+                    </div>
                       </div>
                     </div>
                     <ChevronRight className={cn(
