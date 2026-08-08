@@ -88,19 +88,20 @@ export function FeatureSection() {
                 {t("features.desc")}
               </p>
             </Reveal>
-
-            {PILARS.map((p, i) => (
-              <Reveal key={p.id} delay={0.4 + i * 0.1} y={15} width="100%">
-                <button
-                  onClick={() => setActiveTab(p)}
-                  className={cn(
-                    "group relative grid w-full grid-cols-[3rem_1fr_auto] items-center gap-4 rounded-2xl border p-5 transition-all duration-300",
-                    activeTab.id === p.id
-                      ? "border-accent bg-accent/5 shadow-lg shadow-accent/5"
-                      : "border-ink-line/40 bg-transparent hover:border-ink-line hover:bg-ink-2/50"
-                  )}
-                >
-                  <div className="col-start-1">
+            <div className="mt-12 space-y-3">
+              {PILARS.map((p, i) => (
+                <Reveal key={p.id} delay={0.4 + i * 0.1} y={15} width="100%">
+                  <button
+                    onClick={() => setActiveTab(p)}
+                    className={cn(
+                      "group relative grid w-full items-center rounded-2xl border p-5 transition-all duration-300", 
+                      "grid-cols-[auto_1fr_auto] gap-4",
+                      activeTab.id === p.id
+                        ? "border-accent bg-accent/5 shadow-lg shadow-accent/5"
+                        : "border-ink-line/40 bg-transparent hover:border-ink-line hover:bg-ink-2/50 hover:shadow-sm"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
                     "flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-300",
                     activeTab.id === p.id ? "bg-accent border-accent text-white" : cn("bg-ink-3 border-ink-line", p.color)
                   )}>
