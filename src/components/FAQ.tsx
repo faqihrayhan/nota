@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { Reveal } from "@/components/Reveal";
 import { cn } from "@/lib/utils";
 import { ChevronDown, HelpCircle } from "lucide-react";
 
@@ -10,8 +11,6 @@ const faqData = [
   { q: "faq.q2", a: "faq.a2" },
   { q: "faq.q3", a: "faq.a3" },
   { q: "faq.q4", a: "faq.a4" },
-  { q: "faq.q5", a: "faq.a5" },
-  { q: "faq.q6", a: "faq.a6" },
 ];
 
 export function FAQ() {
@@ -23,57 +22,71 @@ export function FAQ() {
   };
 
   return (
-    <section id="faq" className="relative border-t border-ink-line/40 bg-ink-2/20 scroll-mt-28">
-      <div className="relative mx-auto max-w-3xl px-5 py-24">
+    <section id="faq" className="relative border-t border-ink-line/40 bg-ink-2/10 py-32 scroll-mt-28">
+      <div className="relative mx-auto max-w-4xl px-6">
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-ink-line/40 bg-ink-2/50 px-3 py-1 text-[11px] font-mono uppercase tracking-widest text-text-muted">
-            <HelpCircle className="h-3 w-3" />
-            {t("faq.eyebrow")}
-          </div>
-          <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            {t("faq.title")}
-          </h2>
-          <p className="mt-3 text-text-muted">{t("faq.desc")}</p>
+          <Reveal delay={0.1}>
+            <div className="inline-flex items-center gap-2 rounded-full border border-ink-line/40 bg-ink-2/50 px-3.5 py-1 text-[11px] font-mono uppercase tracking-[0.2em] text-text-muted">
+              <HelpCircle className="h-3.5 w-3.5" />
+              {t("faq.eyebrow")}
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.2}>
+            <h2 className="mt-6 font-display text-4xl font-bold tracking-tight sm:text-5xl">
+              {t("faq.title")}
+            </h2>
+          </Reveal>
+
+          <Reveal delay={0.3}>
+            <p className="mt-4 text-lg text-text-muted max-w-xl mx-auto">
+              {t("faq.desc")}
+            </p>
+          </Reveal>
         </div>
 
-        <div className="mt-12 space-y-3">
+        <div className="mt-16 space-y-4">
           {faqData.map((item, i) => {
             const isOpen = openIndex === i;
             return (
-              <div
-                key={i}
-                className={cn(
-                  "rounded-2xl border transition-all duration-300",
-                  isOpen
-                    ? "border-ink-line/60 bg-ink-2/40 shadow-lg shadow-black/5"
-                    : "border-ink-line/30 bg-ink/40 hover:border-ink-line/50"
-                )}
-              >
-                <button
-                  onClick={() => toggle(i)}
-                  className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
-                >
-                  <span className="font-display text-sm font-semibold text-text">
-                    {t(item.q)}
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-text-muted transition-transform duration-300",
-                      isOpen && "rotate-180"
-                    )}
-                  />
-                </button>
+              <Reveal key={i} delay={0.3 + i * 0.1} y={20}>
                 <div
                   className={cn(
-                    "overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-                    isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                    "overflow-hidden rounded-2xl border transition-all duration-300 backdrop-blur-sm",
+                    isOpen
+                      ? "border-accent/40 bg-ink-2/80 shadow-xl shadow-accent/5"
+                      : "border-ink-line/30 bg-ink/30 hover:border-ink-line/60 hover:bg-ink-2/40"
                   )}
                 >
-                  <p className="px-6 pb-5 text-sm leading-relaxed text-text-muted">
-                    {t(item.a)}
-                  </p>
+                  <button
+                    onClick={() => toggle(i)}
+                    className="flex w-full items-center justify-between gap-6 p-6 text-left"
+                  >
+                    <span className="font-display text-base font-semibold text-text sm:text-lg">
+                      {t(item.q)}
+                    </span>
+                    <div
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ink-line/40 transition-transform duration-300",
+                        isOpen && "bg-accent border-accent text-white rotate-180"
+                      )}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </div>
+                  </button>
+
+                  <div
+                    className={cn(
+                      "overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                      isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                    )}
+                  >
+                    <p className="px-6 pb-6 text-base leading-relaxed text-text-muted border-t border-ink-line/20 pt-4 mt-1">
+                      {t(item.a)}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </Reveal>
             );
           })}
         </div>
