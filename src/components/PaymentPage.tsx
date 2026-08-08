@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useWallet } from "@/context/WalletContext";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { USDC_ADDRESS } from "@/lib/usdc-abi";
@@ -14,6 +16,7 @@ import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
 import { QRScanner } from "@/components/QRScanner";
 import ReceiptModal from "@/components/ReceiptModal";
 import { cn } from "@/lib/utils";
+import { ShoppingBag } from "lucide-react";
 import {
   QrCode,
   Camera,
@@ -93,17 +96,75 @@ function encodeTransferFrom(from: string, to: string, amount: string): string {
   return fnSig + paddedFrom + paddedTo + paddedAmount;
 }
 
-export default function PaymentPage() {
-  const wallet = useWallet();
+export function PaymentPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="relative mx-auto max-w-2xl px-5 py-12">
+          <div className="flex items-center justify-center gap-2 text-text-muted text-sm py-24">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading...
+          </div>
+        </section>
+      }
+    >
+      <PaymentPageInner />
+    </Suspense>
+  );
+}
+
+function PaymentPageInner() {
+  const { address, isCorrectNetwork } = useWallet();
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
+  const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("bayar");
 
   const [items, setItems] = useState<{ name: string; price: string }[]>([
     { name: "", price: "" },
   ]);
   const [category, setCategory] = useState("makan");
-  const [qrData, setQrData] = useState<QRData | null>(null);
-  const [qrRaw, setQrRaw] = useState("");
+  const [qrSvg, setQrSvg] = useState<string>("");
+  const [qrRaw, setQrRaw] = useState<string>("");
+  const [merchantPrefill, setMerchantPrefill] = useState<{ items: string; amount: string } | null>(null);
+
+  // Read query params from /merchant (?source=merchant&items=...&amount=...)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("source") !== "merchant") return;
+    const itemsParam = searchParams.get("items") ?? "";
+    const amountParam = searchParams.get("amount") ?? "";
+    if (!itemsParam && !amountParam) return;
+    setMerchantPrefill({ items: itemsParam, amount: amountParam });
+    // Switch to create tab so cashier can review & generate QR directly.
+    setTab("create");
+    // Prefill items list by parsing "2x Item A, 1x Item B"
+    if (itemsParam) {
+      const parsed: PaymentItem[] = itemsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => {
+          const m = s.match(/^(\d+)x\s+(.+)$/);
+          const qty = m ? Math.max(1, parseInt(m[1], 10)) : 1;
+          const name = (m ? m[2] : s).trim();
+          // Split amount evenly across item rows; qty multiplier applied client-side by cashier.
+          const perItem = amountParam && !isNaN(parseFloat(amountParam))
+            ? (parseFloat(amountParam) / Math.max(1, itemsParam.split(",").length)).toFixed(2)
+            : "0";
+          feeOverrides,
+          );
+          receiptUrl = `${ARC_EXPLORER_URL}/tx/${hash}`;
+          }
+
+          // Finalize shared logic
+          const finalizePayment = (txHash: string, blockNumber: number, merchantAmount: string, merchantWallet: string) => {
+          setReceiptIds((prev) => [String(Date.now()), ...prev]);
+          setSuccessTx(txHash);
+          setScannedData(null);
+          setScanInput("");
+          };
+  }, [searchParams]);
   const [paidTx, setPaidTx] = useState<Transaction | null>(null);
   const [approving, setApproving] = useState(false);
   const [approveTx, setApproveTx] = useState("");
@@ -255,7 +316,7 @@ export default function PaymentPage() {
   };
 
 // Perbaikan fungsi handleTransferFrom di src/components/PaymentPage.tsx sesuai docs.arc.io:
-const handleTransferFrom = async () => {
+const confirmTransfer = async () => {
   if (!scannedData || !wallet.address) return;
   setError("");
   setTransferring(true);
@@ -374,6 +435,31 @@ const handleTransferFrom = async () => {
 
   return (
     <section className="relative mx-auto max-w-2xl px-5 py-12">
+      {merchantItems.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/10 p-4">
+          <div className="flex items-center gap-2 text-primary">
+            <ShoppingBag size={18} />
+            <p className="text-sm font-bold">{t("merchant.prefillReady")}</p>
+          </div>
+          <ul className="mt-3 space-y-1">
+            {merchantItems.map((mi) => (
+              <li key={mi.id} className="flex items-center justify-between text-xs">
+                <span className="text-text-secondary">
+                  {mi.qty}× {mi.name}
+                </span>
+                <span className="font-mono font-bold text-primary">
+                  ${ (mi.price * mi.qty).toFixed(2) }
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex items-center justify-between border-t border-primary/20 pt-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-text-muted">{t("merchant.subtotal")}</span>
+            <span className="text-sm font-black text-primary">${totalMerchantUSDC.toFixed(2)} USDC</span>
+          </div>
+          <p className="mt-2 text-[10px] text-text-muted">{t("merchant.prefillHint")}</p>
+        </div>
+      )}
       <div className="mb-8">
         <div className="inline-flex items-center gap-2 rounded-full border border-ink-line/40 bg-ink-2/50 px-3 py-1 text-[11px] font-mono uppercase tracking-widest text-text-muted">
           <Receipt className="h-3 w-3" />
@@ -382,6 +468,42 @@ const handleTransferFrom = async () => {
         <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">{t("payment.title")}</h1>
         <p className="mt-2 text-text-muted">{t("payment.desc")}</p>
       </div>
+
+      {posPrefill && (
+        <div className="mb-6 rounded-2xl border border-arc/40 bg-arc/10 p-4 backdrop-blur-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-arc" />
+                <p className="text-xs font-bold uppercase tracking-widest text-arc">
+                  {t("payment.posBadge")}
+                </p>
+              </div>
+              <p className="mt-2 text-sm font-semibold text-text">{t("payment.posTitle")}</p>
+              <ul className="mt-2 space-y-1 text-xs text-text-muted">
+                {posPrefill.items.map((item, idx) => (
+                  <li key={idx} className="flex items-center gap-1.5">
+                    <span className="inline-block h-1 w-1 rounded-full bg-arc" />
+                    {item.qty}x {item.name}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 inline-flex items-center gap-2 rounded-lg border border-arc/40 bg-arc/20 px-3 py-1.5 font-mono text-sm font-bold text-arc">
+                {posPrefill.totalUSDC.toFixed(2)} USDC
+              </p>
+              <p className="mt-2 text-[11px] text-text-muted">{t("payment.posHint")}</p>
+            </div>
+            <button
+              onClick={clearPosPrefill}
+              className="rounded-lg p-1.5 text-text-muted transition hover:bg-ink-line/40 hover:text-text"
+              aria-label={t("payment.posDismiss")}
+              title={t("payment.posDismiss")}
+            >
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex rounded-xl border border-ink-line/40 bg-ink-2/30 p-1">
         {(["bayar", "terima"] as Tab[]).map((tKey) => (
