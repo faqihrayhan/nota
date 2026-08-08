@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useWallet } from "@/context/WalletContext";
-import { useLanguage } from "@/i18n";
+import { useLanguage } from "@/context/LanguageContext";
 import { Plus, Minus, X, Trash2, QrCode, RefreshCcw, ArrowLeft, ShoppingCart, Package, CheckCircle2, Wallet, Lock } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
