@@ -1,115 +1,212 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { Reveal } from "@/components/Reveal";
 import { cn } from "@/lib/utils";
-import { CreditCard, BarChart3, TrendingUp, ArrowRight, Sparkles } from "lucide-react";
+import { 
+  CreditCard, 
+  BarChart3, 
+  TrendingUp, 
+  Activity, 
+  ArrowRight, 
+  Sparkles,
+  ChevronRight,
+  Globe
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const iconMap: Record<string, React.ElementType> = {
-  payment: CreditCard,
-  analisa: BarChart3,
-  forecast: TrendingUp,
-};
+const PILARS = [
+  {
+    id: "pilar1",
+    icon: CreditCard,
+    color: "text-blue-400",
+    bgColor: "bg-blue-400/10",
+    borderColor: "border-blue-400/20",
+    href: "/payment",
+    active: true,
+  },
+  {
+    id: "pilar2",
+    icon: BarChart3,
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-400/10",
+    borderColor: "border-emerald-400/20",
+    href: "/analisa",
+    active: true,
+  },
+  {
+    id: "pilar3",
+    icon: TrendingUp,
+    color: "text-amber-400",
+    bgColor: "bg-amber-400/10",
+    borderColor: "border-amber-400/20",
+    href: "/forecast",
+    active: true,
+  },
+  {
+    id: "pilar4",
+    icon: Activity,
+    color: "text-purple-400",
+    bgColor: "bg-purple-400/10",
+    borderColor: "border-purple-400/20",
+    href: "#",
+    active: false,
+  },
+];
 
 export function FeatureSection() {
   const { t } = useLanguage();
-  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
-  const sectionRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const index = Number(entry.target.getAttribute("data-index"));
-            setVisibleCards((prev) => new Set([...prev, index]));
-          }
-        });
-      },
-      { threshold: 0.2, rootMargin: "-50px" }
-    );
-    const cards = sectionRef.current?.querySelectorAll("[data-index]");
-    cards?.forEach((card) => observer.observe(card));
-    return () => observer.disconnect();
-  }, []);
-
-  const features = [
-    {
-      id: "payment",
-      ply: "bg-paper-white",
-      title: t("features.payment.title"),
-      description: t("features.payment.desc"),
-      iconColor: "text-paper-ink",
-      bgGlow: "bg-paper-white/5",
-      href: "/payment",
-    },
-    {
-      id: "analisa",
-      ply: "bg-paper-pink",
-      title: t("features.analisa.title"),
-      description: t("features.analisa.desc"),
-      iconColor: "text-pink-400",
-      bgGlow: "bg-paper-pink/5",
-      href: "/analisa",
-    },
-    {
-      id: "forecast",
-      ply: "bg-paper-yellow",
-      title: t("features.forecast.title"),
-      description: t("features.forecast.desc"),
-      iconColor: "text-amber-400",
-      bgGlow: "bg-paper-yellow/5",
-      href: "/forecast",
-    },
-  ];
+  const [activeTab, setActiveTab] = useState(PILARS[0]);
 
   return (
-    <section ref={sectionRef} id="how-it-works" className="relative border-t border-ink-line/40 bg-ink-2/20 scroll-mt-28">
-      <div className="absolute inset-0 opacity-[0.02]" style={{
-        backgroundImage: `linear-gradient(var(--ink-line) 1px, transparent 1px), linear-gradient(90deg, var(--ink-line) 1px, transparent 1px)`,
-        backgroundSize: "60px 60px",
-      }} />
-      <div className="relative mx-auto max-w-6xl px-5 py-24">
-        <div className="max-w-xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-ink-line/40 bg-ink-2/50 px-3 py-1 text-[11px] font-mono uppercase tracking-widest text-text-muted">
-            <Sparkles className="h-3 w-3" />
-            {t("features.eyebrow")}
-          </div>
-          <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.5rem]">{t("features.title")}</h2>
-          <p className="mt-4 text-text-muted leading-relaxed">{t("features.desc")}</p>
-        </div>
+    <section id="how-it-works" className="relative border-t border-ink-line/40 bg-ink-2/30 py-32 overflow-hidden">
+      {/* Background Decorative Mesh */}
+      <div className="absolute inset-0 -z-10 opacity-30">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,var(--ink-line)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
+      </div>
 
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
-          {features.map((f, i) => {
-            const Icon = iconMap[f.id];
-            const isVisible = visibleCards.has(i);
-            return (
-              <a
-                key={f.id}
-                href={f.href}
-                data-index={i}
-                className={cn("group relative scroll-mt-28 overflow-hidden rounded-2xl border border-ink-line/40 bg-ink transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-ink-line/70 hover:shadow-lg hover:shadow-black/10", isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12")}
-                style={{ transitionDelay: `${i * 150}ms` }}
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="grid gap-16 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+          {/* Left: Headers & Tab Triggers */}
+          <div className="flex flex-col">
+            <Reveal delay={0.1}>
+              <div className="inline-flex items-center gap-2 rounded-full border border-ink-line/40 bg-ink-2/50 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.2em] text-text-muted">
+                <Sparkles className="h-3 w-3" />
+                {t("features.eyebrow")}
+              </div>
+            </Reveal>
+            
+            <Reveal delay={0.2}>
+              <h2 className="mt-6 font-display text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+                {t("features.title")}
+              </h2>
+            </Reveal>
+
+            <Reveal delay={0.3}>
+              <p className="mt-6 text-lg text-text-muted leading-relaxed">
+                {t("features.desc")}
+              </p>
+            </Reveal>
+
+            <div className="mt-12 space-y-4">
+              {PILARS.map((p, i) => (
+                <Reveal key={p.id} delay={0.4 + i * 0.1} y={15} width="100%">
+                  <button
+                    onClick={() => setActiveTab(p)}
+                    className={cn(
+                      "group relative flex w-full items-center justify-between rounded-2xl border p-5 transition-all duration-300",
+                      activeTab.id === p.id
+                        ? "border-accent bg-accent/5 shadow-lg shadow-accent/5"
+                        : "border-ink-line/40 bg-transparent hover:border-ink-line hover:bg-ink-2/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-300",
+                        activeTab.id === p.id ? "bg-accent border-accent text-white" : cn("bg-ink-3 border-ink-line", p.color)
+                      )}>
+                        <p.icon className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className={cn(
+                          "font-display text-lg font-semibold transition-colors",
+                          activeTab.id === p.id ? "text-text" : "text-text-muted group-hover:text-text"
+                        )}>
+                          {t(`features.${p.id}.title`)}
+                        </h3>
+                        {!p.active && (
+                          <span className="mt-0.5 inline-block text-[10px] font-mono uppercase tracking-widest text-accent">
+                            {t("features.tryNow")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className={cn(
+                      "h-5 w-5 transition-all duration-300",
+                      activeTab.id === p.id ? "translate-x-0 opacity-100 text-accent" : "-translate-x-2 opacity-0"
+                    )} />
+                  </button>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: Feature Preview Display */}
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab.id}
+                initial={{ opacity: 0, scale: 0.95, x: 20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.95, x: -20 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                className="relative overflow-hidden rounded-[2.5rem] border border-ink-line/60 bg-ink-2 p-2 shadow-2xl"
               >
-                <div className={`h-1 w-full ${f.ply}`} />
-                <div className={cn("absolute -right-20 -top-20 h-40 w-40 rounded-full blur-[60px] transition-opacity duration-500 opacity-0 group-hover:opacity-100", f.bgGlow)} />
-                <div className="relative p-7">
-                  <div className="flex items-center justify-between">
-                    <span className="rounded-full border border-ink-line/40 bg-ink-2/60 px-2.5 py-0.5 text-[10px] font-medium text-text-faint">{t("features.tryNow")}</span>
+                {/* Visual Content Area */}
+                <div className="aspect-[4/3] w-full overflow-hidden rounded-[2rem] bg-ink relative">
+                   {/* Decorative background for the preview */}
+                  <div className={cn("absolute inset-0 opacity-10 blur-[80px]", activeTab.bgColor)} />
+                  
+                  <div className="relative h-full w-full p-12 flex flex-col justify-center items-center text-center">
+                    <motion.div 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className={cn("mb-8 flex h-24 w-24 items-center justify-center rounded-3xl border-2 shadow-2xl", activeTab.bgColor, activeTab.borderColor)}
+                    >
+                      <activeTab.icon className={cn("h-10 w-10", activeTab.color)} />
+                    </motion.div>
+                    
+                    <motion.h4 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="font-display text-3xl font-bold"
+                    >
+                      {t(`features.${activeTab.id}.title`)}
+                    </motion.h4>
+                    
+                    <motion.p 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="mt-6 max-w-md text-lg text-text-muted"
+                    >
+                      {t(`features.${activeTab.id}.desc`)}
+                    </motion.p>
+                    
+                    {activeTab.active && (
+                      <motion.div
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.5 }}
+                      >
+                        <a 
+                          href={activeTab.href}
+                          className="mt-10 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-6 py-3 text-sm font-medium hover:bg-white/10 transition-colors"
+                        >
+                          {t("features.open")}
+                          <ArrowRight className="h-4 w-4" />
+                        </a>
+                      </motion.div>
+                    )}
                   </div>
-                  <div className="mt-6 flex h-12 w-12 items-center justify-center rounded-xl bg-ink-2 border border-ink-line/30 transition-all duration-300 group-hover:scale-110 group-hover:border-ink-line/50">
-                    <Icon className={cn("h-5 w-5", f.iconColor)} />
-                  </div>
-                  <h3 className="mt-5 font-display text-xl font-semibold tracking-tight">{f.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-text-muted">{f.description}</p>
-                  <div className="mt-5 flex items-center gap-1.5 text-sm text-text-faint transition-all duration-300 group-hover:text-accent">
-                    <span className="font-medium">{t("features.open")}</span>
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+
+                  {/* Mock browser chrome UI dots */}
+                  <div className="absolute top-6 left-8 flex gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-ink-line/60" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-ink-line/60" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-ink-line/60" />
                   </div>
                 </div>
-              </a>
-            );
-          })}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Floating Orbs */}
+            <div className={cn("absolute -top-12 -right-12 h-64 w-64 rounded-full blur-[100px] -z-10 transition-colors duration-1000", activeTab.bgColor)} />
+            <div className={cn("absolute -bottom-12 -left-12 h-48 w-48 rounded-full blur-[80px] -z-10 transition-colors duration-1000", activeTab.bgColor)} />
+          </div>
         </div>
       </div>
     </section>
