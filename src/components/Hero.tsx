@@ -17,7 +17,7 @@ export function Hero() {
   const { t } = useLanguage();
 
   return (
-    <section id="top" className="relative min-h-[90vh] overflow-hidden flex items-center pt-16 pb-20">
+    <section id="top" className="relative min-h-[85vh] overflow-hidden flex items-center pt-12 pb-16">
       {/* Background Animated Gradients — Motion Style */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
         <motion.div 
@@ -116,8 +116,8 @@ export function Hero() {
         </div>
 
         {/* Right Content — The Floating Receipt Mockup */}
-        <Reveal delay={0.5} x={40} duration={1}>
-          <div className="relative mx-auto w-full max-w-md perspective-1000">
+        <Reveal delay={0.5} x={0} duration={1} className="w-full">
+          <div className="relative mx-auto w-full max-w-sm sm:max-w-md px-2 sm:px-0">
             {/* Background Glows */}
             <div className="absolute -inset-10 -z-10">
               <div className="absolute inset-0 rounded-3xl bg-accent/10 blur-3xl" />
@@ -127,21 +127,20 @@ export function Hero() {
             {/* Receipt Stack — Animated Floating */}
             <motion.div 
               animate={{ 
-                y: [0, -15, 0],
-                rotateZ: [1, 2, 1],
-                rotateX: [0, 5, 0]
+                y: [0, -10, 0],
+                rotateZ: [0, 1, 0],
               }}
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
               className="group/receipt relative"
             >
               {/* Layer 3 (Bottom) */}
-              <div className="absolute -inset-3 rotate-[6deg] rounded-2xl bg-paper-yellow/40 p-2 shadow-lg backdrop-blur-[2px] transition-transform duration-500 group-hover/receipt:rotate-[8deg]" />
+              <div className="absolute -inset-2 rotate-[3deg] rounded-2xl bg-paper-yellow/40 p-2 shadow-lg backdrop-blur-[2px]" />
               
               {/* Layer 2 (Middle) */}
-              <div className="absolute -inset-1.5 rotate-[-4deg] rounded-2xl bg-paper-pink/50 p-2 shadow-xl backdrop-blur-[2px] transition-transform duration-500 delay-75 group-hover/receipt:rotate-[-6deg]" />
+              <div className="absolute -inset-1 rotate-[-2deg] rounded-2xl bg-paper-pink/50 p-2 shadow-xl backdrop-blur-[2px]" />
               
               {/* Layer 1 (Main Receipt) */}
-              <div className="relative rotate-[1deg] rounded-2xl bg-paper-white p-8 text-paper-ink shadow-2xl transition-transform duration-500 delay-150 group-hover/receipt:rotate-[2deg]">
+              <div className="relative rounded-2xl bg-paper-white p-6 sm:p-8 text-paper-ink shadow-2xl">
                 <div className="flex items-start justify-between border-b-2 border-dashed border-paper-ink/20 pb-6">
                   <div>
                     <div className="flex items-center gap-2">
@@ -189,7 +188,7 @@ export function Hero() {
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ delay: 2, type: "spring" }}
-                      className="relative z-10 rotate-[-8deg] rounded-md border-[3px] border-stamp-green px-4 py-1.5 font-display text-[14px] font-black tracking-widest text-stamp-green shadow-sm"
+                      className="relative z-10 rotate-[-6deg] rounded-md border-2 sm:border-[3px] border-stamp-green px-2.5 sm:px-3.5 py-1 font-display text-[11px] sm:text-[13px] font-black tracking-widest text-stamp-green shadow-sm"
                     >
                       SUCCESS
                     </motion.div>
