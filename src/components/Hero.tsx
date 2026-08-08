@@ -55,15 +55,15 @@ export function Hero() {
             </div>
           </Reveal>
 
-          <h1 className="mt-8 font-display text-5xl font-bold leading-[0.95] tracking-tight sm:text-7xl lg:text-8xl">
+          <h1 className="mt-6 font-display text-3xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
             <TextReveal text={t("hero.title1")} delay={0.2} />
-            <span className="relative mt-2 block text-accent italic">
+            <span className="relative mt-1 block text-accent italic">
               <TextReveal text={t("hero.title2")} delay={0.4} />
               <motion.svg 
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 1 }}
                 transition={{ duration: 1.5, delay: 1, ease: "easeInOut" }}
-                className="absolute -bottom-4 left-0 w-[80%] max-w-[400px]" 
+                className="absolute -bottom-2 left-0 w-[70%] max-w-[300px]" 
                 viewBox="0 0 300 12" 
                 fill="none"
               >
