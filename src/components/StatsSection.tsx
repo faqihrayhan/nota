@@ -18,7 +18,7 @@ export function StatsSection() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {stats.map((s, i) => (
-            <Reveal key={i} delay={i * 0.1} y={15}>
+            <Reveal key={i} delay={i * 0.1} y={15} width="100%">
               <div className="flex flex-col border-l-2 border-accent/40 pl-5">
                 <span className="text-xs font-mono uppercase tracking-widest text-text-faint">{s.label}</span>
                 <span className="mt-2 font-display text-2xl font-bold text-text sm:text-3xl">{s.value}</span>
