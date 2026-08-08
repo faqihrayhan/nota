@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WalletButton } from "@/components/WalletButton";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Sparkles, Receipt } from "lucide-react";
@@ -54,7 +53,10 @@ export function Hero() {
           </p>
 
           <div className={cn("mt-8 flex flex-wrap items-center gap-3 transition-all duration-1000 delay-400", isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6")}>
-            <WalletButton />
+            <Link href="/payment" className="group inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white transition-all duration-300 hover:bg-accent-strong hover:shadow-lg hover:shadow-accent/20">
+              <Receipt className="h-4 w-4" />
+              {t("hero.ctaPrimary")}
+            </Link>
             <Link href="/#how-it-works" className="group inline-flex items-center gap-2 rounded-full border border-ink-line/60 bg-ink-2/50 px-5 py-2.5 text-sm text-text transition-all duration-300 hover:border-text-muted hover:bg-ink-2">
               <Receipt className="h-4 w-4 text-text-muted transition-colors group-hover:text-text" />
               {t("hero.ctaSecondary")}

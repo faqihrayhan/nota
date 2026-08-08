@@ -5,6 +5,8 @@ import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getTransactions, type Transaction } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import ReceiptModal from "@/components/ReceiptModal";
+import ExportReport from "@/components/ExportReport";
 import {
   BarChart3,
   Receipt,
@@ -15,6 +17,7 @@ import {
   Wallet,
   Loader2,
   ExternalLink,
+  FileText,
 } from "lucide-react";
 
 
@@ -64,6 +67,7 @@ export default function AnalisaPage() {
   const [loading, setLoading] = useState(true);
 
    const [expandedTx, setExpandedTx] = useState<string | null>(null);
+  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
     if (!wallet.address) {
@@ -210,6 +214,11 @@ export default function AnalisaPage() {
             </div>
           </div>
 
+          <ExportReport
+            transactions={isConnected ? transactions : DEMO_TRANSACTIONS}
+            disabled={!isConnected}
+          />
+
           <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
             <h3 className="font-display text-sm font-semibold">{t("analisa.byCategory")}</h3>
             <div className="mt-4 space-y-3">
@@ -282,7 +291,7 @@ export default function AnalisaPage() {
                           </div>
                         )}
                         {tx.tx_hash && (
-                          <div className="pt-1">
+                          <div className="flex items-center justify-between pt-1">
                             <a
                               href={`https://testnet.arcscan.app/tx/${tx.tx_hash}`}
                               target="_blank"
@@ -293,6 +302,16 @@ export default function AnalisaPage() {
                               <ExternalLink className="h-3 w-3" />
                               <span>{t("analisa.viewArcScan")}</span>
                             </a>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReceiptTx(tx);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-line/40 px-3 py-1.5 font-mono text-xs text-text-muted hover:border-accent/50 hover:text-accent transition-all"
+                            >
+                              <FileText className="h-3 w-3" />
+                              <span>{t("analisa.viewReceipt")}</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -304,6 +323,7 @@ export default function AnalisaPage() {
           </div>
         </div>
       )}
+      <ReceiptModal tx={receiptTx} onClose={() => setReceiptTx(null)} />
     </section>
   );
 }

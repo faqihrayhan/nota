@@ -43,7 +43,14 @@ function resolveProvider(id: WalletId): Eip1193Provider | undefined {
   if (typeof window === "undefined") return undefined;
 
   if (id === "okx") {
-    return window.okxwallet?.ethereum ?? window.okxwallet ?? window.ethereum;
+    // Hanya kembalikan provider OKX yang asli. JANGAN fallback ke
+    // window.ethereum — kalau MetaMask terpasang, fallback ini membuat
+    // tombol "OKX Wallet" malah connect ke MetaMask.
+    return (
+      window.okxwallet?.ethereum ??
+      window.okxwallet ??
+      undefined
+    );
   }
 
   const eth = window.ethereum;
@@ -197,7 +204,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const bare = current.replace(/^https?:\/\//, "");
       return `https://metamask.app.link/dapp/${bare}`;
     }
-    // OKX Wallet's in-app browser deep link
+    // OKX Wallet in-app browser deep link (official format:
+    // okx://wallet/dapp/url?dappUrl=<encodeURIComponent(url)>)
     return `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(current)}`;
   }, []);
 

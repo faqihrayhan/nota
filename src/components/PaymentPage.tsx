@@ -12,6 +12,7 @@ import {
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
 import { QRScanner } from "@/components/QRScanner";
+import ReceiptModal from "@/components/ReceiptModal";
 import { cn } from "@/lib/utils";
 import {
   QrCode,
@@ -26,6 +27,7 @@ import {
   Copy,
   ExternalLink,
   Wallet,
+  FileText,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -115,6 +117,7 @@ export default function PaymentPage() {
 
   const [error, setError] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
 
   const total = items.reduce((sum, item) => {
     const price = parseFloat(item.price) || 0;
@@ -730,13 +733,22 @@ const handleTransferFrom = async () => {
                 </div>
               </div>
 
-              <button
-                onClick={() => { setSuccessTx(null); setScannedData(null); setScanInput(""); }}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white hover:bg-accent-strong transition-all"
-              >
-                <Receipt className="h-4 w-4" />
-                {t("payment.newTransaction")}
-              </button>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={() => setReceiptTx(successTx)}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white hover:bg-accent-strong transition-all"
+                >
+                  <FileText className="h-4 w-4" />
+                  {t("payment.viewReceipt")}
+                </button>
+                <button
+                  onClick={() => { setSuccessTx(null); setScannedData(null); setScanInput(""); }}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-ink-line/40 px-6 py-3 text-sm text-text-muted hover:text-text hover:bg-ink-2 transition-all"
+                >
+                  <Receipt className="h-4 w-4" />
+                  {t("payment.newTransaction")}
+                </button>
+              </div>
             </div>
           ) : null}
         </div>
@@ -744,6 +756,7 @@ const handleTransferFrom = async () => {
       {cameraOpen && (
         <QRScanner onScan={handleQRDetected} onClose={closeCamera} />
       )}
+      <ReceiptModal tx={receiptTx} onClose={() => setReceiptTx(null)} />
     </section>
   );
 }
