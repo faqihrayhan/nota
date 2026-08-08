@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
   BookOpen, FileText, Code, HelpCircle, ExternalLink, ChevronDown,
-  CreditCard, BarChart3, TrendingUp, Layers,
+  CreditCard, BarChart3, TrendingUp, Layers, Store,
 } 
 
 
@@ -50,6 +50,7 @@ export function Nav() {
 
   const featureItems = [
     { icon: CreditCard, title: t("nav.payment"), desc: t("features.payment.desc"), href: "/payment" },
+    { icon: Store, title: t("nav.merchant"), desc: t("features.merchant.desc"), href: "/merchant" },
     { icon: BarChart3, title: t("nav.analisa"), desc: t("features.analisa.desc"), href: "/analisa" },
     { icon: TrendingUp, title: t("nav.forecast"), desc: t("features.forecast.desc"), href: "/forecast" },
   ];
