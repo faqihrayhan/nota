@@ -50,7 +50,7 @@ export function FAQ() {
           {faqData.map((item, i) => {
             const isOpen = openIndex === i;
             return (
-              <Reveal key={i} delay={0.3 + i * 0.1} y={20} width="100%">
+              <Reveal key={i} delay={0.3 + i * 0.1} y={20}>
                 <div
                   className={cn(
                     "overflow-hidden rounded-2xl border transition-all duration-300 backdrop-blur-sm",

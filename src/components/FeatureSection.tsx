@@ -91,7 +91,7 @@ export function FeatureSection() {
 
             <div className="mt-12 space-y-4">
               {PILARS.map((p, i) => (
-                <Reveal key={p.id} delay={0.4 + i * 0.1} y={15} width="100%">
+                <Reveal key={p.id} delay={0.4 + i * 0.1} y={15}>
                   <button
                     onClick={() => setActiveTab(p)}
                     className={cn(
