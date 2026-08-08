@@ -1,27 +1,30 @@
 "use client";
 
 import { Reveal } from "@/components/Reveal";
+import { useLanguage } from "@/context/LanguageContext";
 import { Wallet, QrCode, FileCheck } from "lucide-react";
 
 export function WorkflowSection() {
+  const { t } = useLanguage();
+  
   const steps = [
     {
       num: "01",
       icon: Wallet,
-      title: "Hubungkan Wallet",
-      desc: "Konek wallet MetaMask atau OKX Anda yang terhubung ke Arc Testnet dalam satu klik.",
+      title: t("workflow.step1Title"),
+      desc: t("workflow.step1Desc"),
     },
     {
       num: "02",
       icon: QrCode,
-      title: "Scan & Bayar USDC",
-      desc: "Tampilkan QR code pembayaran. Proses transfer USDC instan dengan gas fee native USDC.",
+      title: t("workflow.step2Title"),
+      desc: t("workflow.step2Desc"),
     },
     {
       num: "03",
       icon: FileCheck,
-      title: "Terima Nota & Laporan",
-      desc: "Transaksi otomatis tercatat sebagai nota digital. Unduh PDF/PNG atau ekspor CSV kapan saja.",
+      title: t("workflow.step3Title"),
+      desc: t("workflow.step3Desc"),
     },
   ];
 
@@ -30,13 +33,13 @@ export function WorkflowSection() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="text-center max-w-2xl mx-auto">
           <Reveal delay={0.1}>
-            <span className="text-xs font-mono uppercase tracking-[0.2em] text-accent">Alur Kerja Cepat</span>
+            <span className="text-xs font-mono uppercase tracking-[0.2em] text-accent">{t("workflow.eyebrow")}</span>
           </Reveal>
           <Reveal delay={0.2}>
-            <h2 className="mt-3 font-display text-3xl font-bold sm:text-4xl">3 Langkah Sederhana</h2>
+            <h2 className="mt-3 font-display text-3xl font-bold sm:text-4xl">{t("workflow.title")}</h2>
           </Reveal>
           <Reveal delay={0.3}>
-            <p className="mt-3 text-text-muted">Kemudahan transaksi tanpa ribet input data manual.</p>
+            <p className="mt-3 text-text-muted">{t("workflow.desc")}</p>
           </Reveal>
         </div>
 

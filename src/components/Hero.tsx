@@ -55,20 +55,20 @@ export function Hero() {
             </div>
           </Reveal>
 
-          <h1 className="mt-6 font-display text-3xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-            <TextReveal text={t("hero.title1")} delay={0.2} />
-            <span className="relative mt-1 block text-accent italic">
-              <TextReveal text={t("hero.title2")} delay={0.4} />
-              <motion.svg 
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ duration: 1.5, delay: 1, ease: "easeInOut" }}
-                className="absolute -bottom-2 left-0 w-[70%] max-w-[300px]" 
-                viewBox="0 0 300 12" 
-                fill="none"
-              >
-                <path d="M2 8C50 2 100 2 150 6C200 10 250 10 298 4" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-accent/40" />
-              </motion.svg>
+          <h1 className="mt-6 font-display text-3xl font-bold leading-[1.2] tracking-tight sm:text-5xl lg:text-6xl">
+            <Reveal delay={0.2} y={15} duration={0.6} width="100%">
+              {t("hero.title1")}
+            </Reveal>
+            <span className="relative mt-3 block text-accent italic leading-[1.2]">
+              <Reveal delay={0.4} y={15} duration={0.6} width="100%">
+                {t("hero.title2")}
+              </Reveal>
+              <motion.div 
+                initial={{ scaleX: 0, opacity: 0, originX: 0 }}
+                whileInView={{ scaleX: 1, opacity: 1 }}
+                transition={{ duration: 0.8, delay: 1.2, ease: "easeOut" }}
+                className="absolute -bottom-1 left-0 h-2 w-full max-w-[240px] bg-accent/30 rounded-full blur-[2px]"
+              />
             </span>
           </h1>
 

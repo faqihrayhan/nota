@@ -1,91 +1,76 @@
 "use client";
 
-import { motion, useInView, type Variants } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 
-interface RevealProps {
+/**
+ * Reveal Component — Animasi standar muncul saat di-scroll
+ */
+export function Reveal({
+  children,
+  delay = 0,
+  duration = 0.6,
+  y = 20,
+  x = 0,
+  className,
+}: {
   children: React.ReactNode;
-  width?: "fit-content" | "100%";
   delay?: number;
   duration?: number;
   y?: number;
   x?: number;
   className?: string;
-}
-
-/**
- * Reveal Component — Gaya Motion
- * Efek halus saat elemen masuk ke viewport.
- */
-export function Reveal({
-  children,
-  width = "fit-content",
-  delay = 0,
-  duration = 0.5,
-  y = 25,
-  x = 0,
-  className,
-}: RevealProps) {
+}) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
-  const variants: Variants = {
-    hidden: { 
-      opacity: 0, 
-      y, 
-      x,
-      filter: "blur(8px)" 
-    },
-    visible: { 
-      opacity: 1, 
-      y: 0, 
-      x: 0,
-      filter: "blur(0px)",
-      transition: {
-        duration,
-        delay,
-        ease: [0.16, 1, 0.3, 1], // easeOutExpo
-      }
-    },
-  };
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
 
   return (
-    <div ref={ref} style={{ position: "relative", width, overflow: "visible" }} className={className}>
-      <motion.div
-        variants={variants}
-        initial="hidden"
-        animate={isInView ? "visible" : "hidden"}
-      >
-        {children}
-      </motion.div>
-    </div>
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y, x }}
+      animate={isInView ? { opacity: 1, y: 0, x: 0 } : { opacity: 0, y, x }}
+      transition={{ duration, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
   );
 }
 
 /**
- * TextReveal — Reveal khusus untuk baris teks atau heading.
+ * TextReveal — Menggantikan logika per kata/karakter dengan animasi blok halus
+ * agar layout tidak lagi terpotong (clipped) di HP.
  */
-export function TextReveal({ text, className, delay = 0 }: { text: string; className?: string; delay?: number }) {
-  const words = text.split(" ");
-  
+export function TextReveal({
+  text,
+  className,
+  delay = 0,
+  as: Component = "span",
+}: {
+  text: string | string[];
+  className?: string;
+  delay?: number;
+  as?: "h1" | "h2" | "span" | "p";
+}) {
+  const content = Array.isArray(text) ? text : [text];
+
   return (
-    <div className={className}>
-      {words.map((word, i) => (
-        <span key={i} className="inline-block overflow-hidden mr-[0.25em] pb-[0.1em]">
-          <motion.span
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            transition={{
-              duration: 0.8,
-              delay: delay + i * 0.05,
-              ease: [0.16, 1, 0.3, 1],
-            }}
-            className="inline-block"
-          >
-            {word}
-          </motion.span>
-        </span>
+    <span className={className} style={{ display: "block", overflow: "hidden" }}>
+      {content.map((item, index) => (
+        <motion.span
+          key={index}
+          initial={{ y: "120%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{
+            duration: 0.9,
+            delay: delay + index * 0.15,
+            ease: [0.16, 1, 0.3, 1], // easeOutExpo
+          }}
+          style={{ display: "block" }}
+        >
+          {item}
+        </motion.span>
       ))}
-    </div>
+    </span>
   );
 }

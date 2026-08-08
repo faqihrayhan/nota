@@ -7,10 +7,10 @@ export function StatsSection() {
   const { t } = useLanguage();
 
   const stats = [
-    { label: "Jaringan Network", value: "Arc Testnet", desc: "Chain ID 5042002" },
-    { label: "Kecepatan Settlement", value: "< 1 Detik", desc: "Transaksi Instan" },
-    { label: "Akurasi Pembukuan", value: "100% On-Chain", desc: "Otomatis & Terverifikasi" },
-    { label: "Standard Format", value: "PDF & CSV", desc: "Format Ekspor Resmi" },
+    { label: t("stats.network"), value: t("stats.networkValue"), desc: t("stats.networkDesc") },
+    { label: t("stats.settlement"), value: t("stats.settlementValue"), desc: t("stats.settlementDesc") },
+    { label: t("stats.accuracy"), value: t("stats.accuracyValue"), desc: t("stats.accuracyDesc") },
+    { label: t("stats.format"), value: t("stats.formatValue"), desc: t("stats.formatDesc") },
   ];
 
   return (
