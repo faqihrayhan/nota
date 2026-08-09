@@ -34,7 +34,7 @@ export type CatalogItem = {
   id: string;
   wallet_address: string;
   name: string;
-  price_idr: number;
+  price_usdc: number;
   created_at: string;
   updated_at: string;
 };
@@ -44,7 +44,7 @@ export type CartItem = {
   wallet_address: string;
   item_name: string;
   qty: number;
-  price_idr: number;
+  price_usdc: number;
   added_at: string;
 };
 
@@ -63,14 +63,14 @@ export async function getCatalog(walletAddress: string): Promise<CatalogItem[]> 
 export async function addCatalogItem(
   walletAddress: string,
   name: string,
-  priceIdr: number
+  priceUsdc: number
 ): Promise<CatalogItem> {
   const { data, error } = await supabase
     .from("merchant_catalog")
     .insert({
       wallet_address: walletAddress.toLowerCase(),
       name,
-      price_idr: priceIdr,
+      price_usdc: priceUsdc,
     })
     .select()
     .single();
@@ -81,11 +81,11 @@ export async function addCatalogItem(
 export async function updateCatalogItem(
   id: string,
   name: string,
-  priceIdr: number
+  priceUsdc: number
 ): Promise<void> {
   const { error } = await supabase
     .from("merchant_catalog")
-    .update({ name, price_idr: priceIdr, updated_at: new Date().toISOString() })
+    .update({ name, price_usdc: priceUsdc, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
 }
@@ -111,7 +111,7 @@ export async function addToCart(
   walletAddress: string,
   itemName: string,
   qty: number,
-  priceIdr: number
+  priceUsdc: number
 ): Promise<CartItem> {
   // Check if item already exists in cart
   const existing = await supabase
@@ -138,7 +138,7 @@ export async function addToCart(
       wallet_address: walletAddress.toLowerCase(),
       item_name: itemName,
       qty,
-price_idr: priceIdr,
+      price_usdc: priceUsdc,
     })
     .select()
     .single();

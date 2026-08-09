@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -23,6 +23,7 @@ import {
   fetchExchangeRate,
   getCachedRate,
   idrToUsdc,
+  usdcToIdr,
   formatIDR,
   formatUSDC,
   type ExchangeRate,
@@ -58,14 +59,16 @@ function encodeQR(data: Record<string, unknown>): string {
   }
 }
 
-// Default catalog items (akan di-seed ke Supabase kalau catalog kosong)
-const DEFAULT_CATALOG: { name: string; priceIdr: number }[] = [
-  { name: "Kopi Susu Gula Aren", priceIdr: 25000 },
-  { name: "Croissant Butter", priceIdr: 20000 },
-  { name: "Nasi Goreng Spesial", priceIdr: 40000 },
-  { name: "Es Teh Manis", priceIdr: 10000 },
-  { name: "Air Mineral", priceIdr: 6000 },
-  { name: "Jus Alpukat", priceIdr: 30000 },
+// Default catalog items (akan di-seed ke Supabase kalau catalog kosong).
+// Harga disimpan dalam USDC — nilai di bawah ≈ harga IDR dibagi
+// DEFAULT_IDR_PER_USDC (16200), dibulatkan 2 desimal.
+const DEFAULT_CATALOG: { name: string; priceUsdc: number }[] = [
+  { name: "Kopi Susu Gula Aren", priceUsdc: 1.54 },
+  { name: "Croissant Butter", priceUsdc: 1.23 },
+  { name: "Nasi Goreng Spesial", priceUsdc: 2.47 },
+  { name: "Es Teh Manis", priceUsdc: 0.62 },
+  { name: "Air Mineral", priceUsdc: 0.37 },
+  { name: "Jus Alpukat", priceUsdc: 1.85 },
 ];
 
 export default function MerchantPage() {
@@ -127,7 +130,7 @@ export default function MerchantPage() {
       // Seed default catalog kalau kosong (hanya sekali per wallet)
       if (items.length === 0) {
         for (const item of DEFAULT_CATALOG) {
-          await addCatalogItem(address, item.name, item.priceIdr);
+          await addCatalogItem(address, item.name, item.priceUsdc);
         }
         items = await getCatalog(address);
       }
@@ -163,9 +166,9 @@ console.error("Failed to load cart:", err);
     }
   }
 
-  // Cart calculations
-  const cartTotalIDR = cart.reduce((sum, item) => sum + item.price_idr * item.qty, 0);
-  const cartTotalUSDC = idrToUsdc(cartTotalIDR, rate.idrPerUsdc);
+  // Cart calculations — harga asli disimpan dalam USDC, IDR adalah turunan.
+  const cartTotalUSDC = cart.reduce((sum, item) => sum + item.price_usdc * item.qty, 0);
+  const cartTotalIDR = usdcToIdr(cartTotalUSDC, rate.idrPerUsdc);
   const formattedTotal =
     currencyMode === "IDR" ? formatIDR(cartTotalIDR) : formatUSDC(cartTotalUSDC);
 
@@ -179,9 +182,9 @@ console.error("Failed to load cart:", err);
     if (!address || !newItemName.trim() || !newItemPrice.trim()) return;
     const priceNum = parseFloat(newItemPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
-    const priceIdr = currencyMode === "USDC" ? priceNum * rate.idrPerUsdc : priceNum;
+    const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
     try {
-      await addCatalogItem(address, newItemName.trim(), priceIdr);
+      await addCatalogItem(address, newItemName.trim(), priceUsdc);
       setNewItemName("");
       setNewItemPrice("");
       setIsAdding(false);
@@ -195,7 +198,7 @@ console.error("Failed to load cart:", err);
   async function handleAddToCart(item: CatalogItem) {
     if (!address) return;
     try {
-      await addToCart(address, item.name, 1, item.price_idr);
+      await addToCart(address, item.name, 1, item.price_usdc);
       await loadCart();
     } catch (err) {
       setError(t("merchant.failedToAddToCart"));
@@ -240,7 +243,7 @@ console.error("Failed to load cart:", err);
     const totalUsdc = cartTotalUSDC.toFixed(6);
     const itemsForQR = cart.map((item) => ({
       name: item.item_name,
-      price: idrToUsdc(item.price_idr, rate.idrPerUsdc),
+      price: item.price_usdc,
     }));
 
     const qrPayload = {
@@ -269,7 +272,7 @@ console.error("Failed to load cart:", err);
         payee_address: address.toLowerCase(),
         amount: qrTotal,
         category: "belanja",
-        items: cart.map((c) => ({ name: c.item_name, price: idrToUsdc(c.price_idr, rate.idrPerUsdc) })),
+        items: cart.map((c) => ({ name: c.item_name, price: c.price_usdc })),
         tx_hash: `0xsimulated${Date.now()}`,
         block_hash: `0xsimulated${Date.now()}`,
         block_number: 0,
@@ -411,8 +414,8 @@ console.error("Failed to load cart:", err);
                       <div>
                         <p className="font-medium text-text">{item.name}</p>
                         <p className="text-sm text-text-muted">
-                          {formatIDR(item.price_idr)}
-                          {currencyMode === "USDC" && ` ≈ ${formatUSDC(idrToUsdc(item.price_idr, rate.idrPerUsdc))}`}
+                          {formatUSDC(item.price_usdc)}
+                          {currencyMode === "IDR" && ` ≈ ${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))}`}
                         </p>
                       </div>
                       <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -485,8 +488,8 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                             <p className="font-medium text-text">{item.item_name}</p>
                             <p className="text-sm text-text-muted">
                               {currencyMode === "IDR"
-                                ? `${formatIDR(item.price_idr)} × ${item.qty}`
-                                : `${formatUSDC(idrToUsdc(item.price_idr, rate.idrPerUsdc))} × ${item.qty}`}
+                                ? `${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))} × ${item.qty}`
+                                : `${formatUSDC(item.price_usdc)} × ${item.qty}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
