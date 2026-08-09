@@ -137,33 +137,35 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
               compact ? "relative w-full" : "absolute right-0 w-60"
             )}
           >
-            <div className="border-b border-ink-line/30 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-wider text-text-faint">
-                {t("wallet.connectedVia")}
-              </p>
-              <p className="mt-0.5 text-sm font-medium capitalize">
-                {WALLET_LABELS[wallet.walletId ?? "metamask"]}
-              </p>
+            <div className="max-h-[70vh] overflow-y-auto">
+              <div className="border-b border-ink-line/30 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-wider text-text-faint">
+                  {t("wallet.connectedVia")}
+                </p>
+                <p className="mt-0.5 text-sm font-medium capitalize">
+                  {WALLET_LABELS[wallet.walletId ?? "metamask"]}
+                </p>
+              </div>
+              <a
+                href={`${ARC_EXPLORER_URL}/address/${wallet.address}`}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center gap-2 px-4 py-3 text-sm text-text transition-colors hover:bg-ink-3"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-text-muted" />
+                {t("wallet.viewExplorer")}
+              </a>
+              <button
+                onClick={() => {
+                  wallet.disconnect();
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-warn-amber transition-colors hover:bg-ink-3"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                {t("wallet.disconnect")}
+              </button>
             </div>
-            <a
-              href={`${ARC_EXPLORER_URL}/address/${wallet.address}`}
-              target="_blank"
-              rel="noreferrer"
-              className="group flex items-center gap-2 px-4 py-3 text-sm text-text transition-colors hover:bg-ink-3"
-            >
-              <ExternalLink className="h-3.5 w-3.5 text-text-muted" />
-              {t("wallet.viewExplorer")}
-            </a>
-            <button
-              onClick={() => {
-                wallet.disconnect();
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-warn-amber transition-colors hover:bg-ink-3"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              {t("wallet.disconnect")}
-            </button>
           </div>
         )}
       </div>
@@ -205,65 +207,67 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
               : "absolute right-0 w-64"
           )}
         >
-          <div className="border-b border-ink-line/30 bg-ink-2 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-wider text-text-faint">
-              {t("wallet.pick")}
-            </p>
-          </div>
-          {WALLETS.map((w) => {
-            const available = wallet.isProviderAvailable(w.id);
+          <div className="max-h-[70vh] overflow-y-auto">
+            <div className="border-b border-ink-line/30 bg-ink-2 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wider text-text-faint">
+                {t("wallet.pick")}
+              </p>
+            </div>
+            {WALLETS.map((w) => {
+              const available = wallet.isProviderAvailable(w.id);
 
-            if (!available && wallet.isMobile && w.id === "metamask") {
-              // MetaMask is handled by SDK — always available
-              // (won't reach here since isProviderAvailable returns true for metamask)
-            }
+              if (!available && wallet.isMobile && w.id === "metamask") {
+                // MetaMask is handled by SDK — always available
+                // (won't reach here since isProviderAvailable returns true for metamask)
+              }
 
-            if (!available) {
-              // Not detected — show as unavailable
-              return (
-                <div
-                  key={w.id}
-                  className="flex items-center justify-between px-4 py-3 text-sm text-text-muted"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px] text-text-faint">
-                      {w.monogram}
+              if (!available) {
+                // Not detected — show as unavailable
+                return (
+                  <div
+                    key={w.id}
+                    className="flex items-center justify-between px-4 py-3 text-sm text-text-muted"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px] text-text-faint">
+                        {w.monogram}
+                      </span>
+                      {w.label}
                     </span>
-                    {w.label}
-                  </span>
-                  <span className="text-[11px] text-text-faint">
-                    {t("wallet.notDetected")}
-                  </span>
-                </div>
-              );
-            }
+                    <span className="text-[11px] text-text-faint">
+                      {t("wallet.notDetected")}
+                    </span>
+                  </div>
+                );
+              }
 
-            return (
-              <button
-                key={w.id}
-                onClick={() => handlePick(w.id)}
-                className="flex w-full items-center gap-3 bg-ink-2 px-4 py-3 text-left text-sm text-text transition-colors hover:bg-ink-3"
-              >
-                <span
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px]"
-                  style={{ color: w.color }}
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => handlePick(w.id)}
+                  className="flex w-full items-center gap-3 bg-ink-2 px-4 py-3 text-left text-sm text-text transition-colors hover:bg-ink-3"
                 >
-                  {w.monogram}
-                </span>
-                {w.label}
-              </button>
-            );
-          })}
-          {wallet.status === "error" && wallet.error === "not_found" && (
-            <p className="border-t border-ink-line/30 px-4 py-3 text-xs text-warn-amber">
-              {t("wallet.notInstalled")}
-            </p>
-          )}
-          {wallet.status === "error" && wallet.error === "rejected" && (
-            <p className="border-t border-ink-line/30 px-4 py-3 text-xs text-warn-amber">
-              {t("wallet.rejected")}
-            </p>
-          )}
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px]"
+                    style={{ color: w.color }}
+                  >
+                    {w.monogram}
+                  </span>
+                  {w.label}
+                </button>
+              );
+            })}
+            {wallet.status === "error" && wallet.error === "not_found" && (
+              <p className="border-t border-ink-line/30 px-4 py-3 text-xs text-warn-amber">
+                {t("wallet.notInstalled")}
+              </p>
+            )}
+            {wallet.status === "error" && wallet.error === "rejected" && (
+              <p className="border-t border-ink-line/30 px-4 py-3 text-xs text-warn-amber">
+                {t("wallet.rejected")}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
