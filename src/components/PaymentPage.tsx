@@ -35,7 +35,7 @@ function generateNonce() {
 
 function formatUSDC(amount: string | number): string {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return num.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  return num.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function decodeQR(raw: string): { payerAddress: string; totalAmount: string; items: { name: string; price: number }[]; category: string; timestamp: number; expiresAt: number; nonce: string } | null {
