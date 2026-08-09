@@ -118,7 +118,7 @@ export function FeatureSection() {
                         {t(`features.${p.id}.title`)}
                       </h3>
                       <span className={cn(
-                        "mt-1 block text-[10px] font-mono uppercase tracking-[0.2em] text-accent font-medium h-4",
+                        "mt-1 block text-[10px] font-mono uppercase tracking-[0.2em] text-accent font-medium",
                         activeTab.id === p.id ? "opacity-100" : "opacity-0"
                       )}>
                         {p.active ? "" : t("features.comingSoon")}
