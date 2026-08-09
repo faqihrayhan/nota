@@ -11,14 +11,6 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// transactions.id is TEXT (no DB-side default), so the client generates it.
-// crypto.randomUUID() is available in all modern browsers + Node ≥ 19.
-function newId(): string {
-  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 // Types
 export type Transaction = {
   id: string;
@@ -199,7 +191,6 @@ export async function saveTransaction(tx: Omit<Transaction, "id" | "created_at">
   const { data, error } = await supabase
     .from("transactions")
     .insert({
-      id: newId(),
       ...tx,
       wallet_address: tx.wallet_address.toLowerCase(),
     })
