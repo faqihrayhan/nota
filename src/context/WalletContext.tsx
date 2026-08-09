@@ -13,7 +13,7 @@ import {
   ARC_TESTNET_PARAMS,
 } from "@/lib/arc-chain";
 
-export type WalletId = "metamask" | "okx";
+export type WalletId = "metamask" | "okx" | "rabby" | "rainbow";
 
 type WalletState = {
   address: string | null;
@@ -37,35 +37,67 @@ const WalletContext = createContext<WalletContextValue | null>(null);
 
 const STORAGE_KEY = "arc-nota:last-wallet";
 
-// Some wallets (MetaMask, OKX, others) can all inject into `window.ethereum`
-// at once. This picks out the right one for the wallet the user chose.
-function resolveProvider(id: WalletId): Eip1193Provider | undefined {
+// Wallet-specific detection flags on window.ethereum providers.
+// Rabby injects window.ethereum with isRabby=true (or appears as a provider).
+// Rainbow injects window.ethereum with isRainbow=true.
+// Each wallet's official EIP-1193 provider is matched by its unique flag.
+function findProvider(
+  predicate: (p: { isMetaMask?: boolean; isRabby?: boolean; isRainbow?: boolean }) => boolean
+): Eip1193Provider | undefined {
   if (typeof window === "undefined") return undefined;
-
-  if (id === "okx") {
-    // Hanya kembalikan provider OKX yang asli. JANGAN fallback ke
-    // window.ethereum — kalau MetaMask terpasang, fallback ini membuat
-    // tombol "OKX Wallet" malah connect ke MetaMask.
-    return (
-      window.okxwallet?.ethereum ??
-      window.okxwallet ??
-      undefined
-    );
-  }
-
-  const eth = window.ethereum;
+  const eth = window.ethereum as
+    | (Eip1193Provider & {
+        providers?: { isMetaMask?: boolean; isRabby?: boolean; isRainbow?: boolean }[];
+      })
+    | undefined;
   if (!eth) return undefined;
   if (Array.isArray(eth.providers)) {
-    return eth.providers.find((p) => p.isMetaMask) ?? eth.providers[0] ?? undefined;
+    return eth.providers.find(predicate) as Eip1193Provider | undefined;
   }
-  return eth.isMetaMask ? eth : eth;
+  return predicate(eth as { isMetaMask?: boolean; isRabby?: boolean; isRainbow?: boolean })
+    ? (eth as Eip1193Provider)
+    : undefined;
 }
 
+function resolveProvider(id: WalletId): Eip1193Provider | undefined {
+  if (typeof window === "undefined") return undefined;
+  switch (id) {
+    case "okx":
+      return (
+        (window as unknown as { okxwallet?: { ethereum?: Eip1193Provider } }).okxwallet?.ethereum ??
+        (window as unknown as { okxwallet?: Eip1193Provider }).okxwallet ??
+        undefined
+      );
+    case "rabby":
+      return findProvider((p) => "isRabby" in p && p.isRabby === true);
+    case "rainbow":
+      return findProvider((p) => "isRainbow" in p && p.isRainbow === true);
+    case "metamask":
+    default:
+      return findProvider((p) => "isMetaMask" in p && p.isMetaMask === true);
+  }
+}
 
 function isMobileUserAgent() {
   if (typeof navigator === "undefined") return false;
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
+
+const WALLET_DEEP_LINKS: Record<WalletId, (url: string) => string> = {
+  metamask: (url) => {
+    const bare = url.replace(/^https?:\/\//, "");
+    return `https://metamask.app.link/dapp/${bare}`;
+  },
+  okx: (url) => `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(url)}`,
+  rabby: (url) => {
+    // Rabby's universal link opens the app and navigates to the dApp URL
+    return `https://rabby.io/dapp/connect?url=${encodeURIComponent(url)}`;
+  },
+  rainbow: (url) => {
+    // Rainbow's deep link: opens the Rainbow app with the dApp URL
+    return `https://rnbwapp.com/dapp/${encodeURIComponent(url)}`;
+  },
+};
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WalletState>({
@@ -85,9 +117,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!state.walletId) throw new Error("no_wallet");
     const provider = resolveProvider(state.walletId);
     if (!provider) {
-      // Ini biasanya kejadian di HP: tidak ada ekstensi wallet yang
-      // "nyuntik" window.ethereum di browser biasa. Lempar error yang
-      // jelas supaya UI bisa kasih tahu user, bukan diam saja.
       throw new Error("no_provider");
     }
 
@@ -159,9 +188,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const disconnect = useCallback(() => {
-    // Injected wallets don't have a universal "disconnect" RPC call —
-    // this just clears local state. The wallet extension itself stays
-    // connected until the user revokes it from the wallet's own UI.
     window.localStorage.removeItem(STORAGE_KEY);
     setState({
       address: null,
@@ -172,11 +198,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Quietly reconnect on page load if the user connected before, so a
-  // refresh doesn't force them to click "Connect" again.
+  // Quietly reconnect on page load if the user connected before
   useEffect(() => {
     const last = window.localStorage.getItem(STORAGE_KEY) as WalletId | null;
-    if (last === "metamask" || last === "okx") {
+    const validIds: WalletId[] = ["metamask", "okx", "rabby", "rainbow"];
+    if (last && validIds.includes(last)) {
       const provider = resolveProvider(last);
       if (!provider) return;
       provider
@@ -197,17 +223,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const mobileDeepLink = useCallback((id: WalletId) => {
-    if (typeof window === "undefined") return "#";
-    const current = window.location.href;
-    if (id === "metamask") {
-      const bare = current.replace(/^https?:\/\//, "");
-      return `https://metamask.app.link/dapp/${bare}`;
-    }
-    // OKX Wallet in-app browser deep link (official format:
-    // okx://wallet/dapp/url?dappUrl=<encodeURIComponent(url)>)
-    return `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(current)}`;
-  }, []);
+  const mobileDeepLink = useCallback(
+    (id: WalletId) => {
+      if (typeof window === "undefined") return "#";
+      const current = window.location.href;
+      const fn = WALLET_DEEP_LINKS[id] ?? WALLET_DEEP_LINKS.metamask;
+      return fn(current);
+    },
+    []
+  );
 
   const isCorrectNetwork = state.chainIdHex === ARC_TESTNET_CHAIN_ID_HEX;
 
