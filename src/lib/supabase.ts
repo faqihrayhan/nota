@@ -4,20 +4,17 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.warn(
-    "Supabase credentials not found. Payment features will use localStorage fallback."
+  throw new Error(
+    "Supabase credentials required. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local"
   );
 }
 
-export const supabase = supabaseUrl && supabaseKey
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Fallback: localStorage-based storage kalau Supabase belum setup
-const STORAGE_KEY = "arc-nota:transactions";
-
+// Types
 export type Transaction = {
   id: string;
+  wallet_address: string;
   payer_address: string;
   payee_address: string;
   amount: number;
@@ -30,33 +27,192 @@ export type Transaction = {
   mode: "payment" | "receive";
   created_at: string;
   expires_at?: string;
-  // nonce dari QR yang di-scan — dipakai sisi generator untuk tahu
-  // QR mana yang baru saja "lunas" tanpa harus reload manual.
   nonce?: string;
 };
 
-// Dipanggil sisi yang men-generate QR untuk cek apakah nonce tertentu
-// sudah punya transaksi yang cocok (artinya sudah dibayar).
+export type CatalogItem = {
+  id: string;
+  wallet_address: string;
+  name: string;
+  price_idr: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CartItem = {
+  id: string;
+  wallet_address: string;
+  item_name: string;
+  qty: number;
+  price_idr: number;
+  added_at: string;
+};
+
+// ─── Catalog ────────────────────────────────────────────────
+
+export async function getCatalog(walletAddress: string): Promise<CatalogItem[]> {
+  const { data, error } = await supabase
+    .from("merchant_catalog")
+    .select("*")
+    .eq("wallet_address", walletAddress.toLowerCase())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addCatalogItem(
+  walletAddress: string,
+  name: string,
+  priceIdr: number
+): Promise<CatalogItem> {
+  const { data, error } = await supabase
+    .from("merchant_catalog")
+    .insert({
+      wallet_address: walletAddress.toLowerCase(),
+      name,
+      price_idr: priceIdr,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCatalogItem(
+  id: string,
+  name: string,
+  priceIdr: number
+): Promise<void> {
+  const { error } = await supabase
+    .from("merchant_catalog")
+    .update({ name, price_idr: priceIdr, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCatalogItem(id: string): Promise<void> {
+  const { error } = await supabase.from("merchant_catalog").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Cart ───────────────────────────────────────────────────
+
+export async function getCart(walletAddress: string): Promise<CartItem[]> {
+  const { data, error } = await supabase
+    .from("merchant_cart")
+    .select("*")
+    .eq("wallet_address", walletAddress.toLowerCase())
+    .order("added_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addToCart(
+  walletAddress: string,
+  itemName: string,
+  qty: number,
+  priceIdr: number
+): Promise<CartItem> {
+  // Check if item already exists in cart
+  const existing = await supabase
+    .from("merchant_cart")
+    .select("*")
+    .eq("wallet_address", walletAddress.toLowerCase())
+    .eq("item_name", itemName)
+    .maybeSingle();
+
+  if (existing.data) {
+    // Update qty
+    const { error } = await supabase
+      .from("merchant_cart")
+      .update({ qty: existing.data.qty + qty })
+      .eq("id", existing.data.id);
+    if (error) throw error;
+    return { ...existing.data, qty: existing.data.qty + qty };
+  }
+
+  // Insert new
+  const { data, error } = await supabase
+    .from("merchant_cart")
+    .insert({
+      wallet_address: walletAddress.toLowerCase(),
+      item_name: itemName,
+      qty,
+price_idr: priceIdr,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCartItemQty(id: string, qty: number): Promise<void> {
+  if (qty <= 0) {
+    await removeFromCart(id);
+    return;
+  }
+  const { error } = await supabase
+    .from("merchant_cart")
+    .update({ qty })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function removeFromCart(id: string): Promise<void> {
+  const { error } = await supabase.from("merchant_cart").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function clearCart(walletAddress: string): Promise<void> {
+  const { error } = await supabase
+    .from("merchant_cart")
+    .delete()
+    .eq("wallet_address", walletAddress.toLowerCase());
+  if (error) throw error;
+}
+
+// ─── Transactions ───────────────────────────────────────────
+
+export async function getTransactions(
+  walletAddress: string,
+  limit = 50
+): Promise<Transaction[]> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("wallet_address", walletAddress.toLowerCase())
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveTransaction(tx: Omit<Transaction, "id" | "created_at">): Promise<Transaction> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .insert({
+      ...tx,
+      wallet_address: tx.wallet_address.toLowerCase(),
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function findTransactionByNonce(
   nonce: string
 ): Promise<Transaction | null> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("nonce", nonce)
-      .maybeSingle();
-    if (error) return null;
-    return data;
-  }
-  return getLocalTransactions().find((t) => t.nonce === nonce) || null;
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("nonce", nonce)
+    .maybeSingle();
+  if (error) return null;
+  return data;
 }
 
-// Berlangganan perubahan tabel transactions secara realtime (kalau Supabase
-// aktif). Mengembalikan function `unsubscribe` untuk dipanggil saat komponen
-// unmount, supaya tidak ada listener yang "nyangkut".
 export function subscribeToTransactions(onInsert: () => void): () => void {
-  if (!supabase) return () => {};
   const channel = supabase
     .channel("transactions-changes")
     .on(
@@ -68,65 +224,4 @@ export function subscribeToTransactions(onInsert: () => void): () => void {
   return () => {
     supabase.removeChannel(channel);
   };
-}
-
-export async function saveTransaction(tx: Transaction): Promise<void> {
-  if (supabase) {
-    const { error } = await supabase.from("transactions").insert(tx);
-    if (error) throw error;
-    return;
-  }
-  // Fallback localStorage
-  const existing = getLocalTransactions();
-  existing.push(tx);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-}
-
-// Ganti fungsi getTransactions di src/lib/supabase.ts dengan versi yang presisi ini:
-export async function getTransactions(address: string): Promise<Transaction[]> {
-  const normalizedAddr = address.toLowerCase();
-
-  if (supabase) {
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .or(`payer_address.ilike.%${normalizedAddr}%,payee_address.ilike.%${normalizedAddr}%`)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching transactions from Supabase:", error);
-      throw error;
-    }
-    return data || [];
-  }
-
-  // Fallback localStorage jika Supabase tidak aktif
-  return getLocalTransactions().filter(
-    (t) =>
-      t.payer_address.toLowerCase() === normalizedAddr ||
-      t.payee_address.toLowerCase() === normalizedAddr
-  );
-}
-
-
-
-export async function getTransactionByTxHash(txHash: string): Promise<Transaction | null> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("tx_hash", txHash)
-      .single();
-    if (error) return null;
-    return data;
-  }
-  return getLocalTransactions().find((t) => t.tx_hash === txHash) || null;
-}
-
-function getLocalTransactions(): Transaction[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
 }

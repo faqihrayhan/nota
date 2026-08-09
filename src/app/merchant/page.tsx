@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { MerchantPage } from "@/components/MerchantPage";
+import MerchantPage from "@/components/MerchantPage";
+
 
 export const metadata: Metadata = {
   title: "Merchant POS — Nota",
