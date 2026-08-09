@@ -59,18 +59,6 @@ function encodeQR(data: Record<string, unknown>): string {
   }
 }
 
-// Default catalog items (akan di-seed ke Supabase kalau catalog kosong).
-// Harga disimpan dalam USDC — nilai di bawah ≈ harga IDR dibagi
-// DEFAULT_IDR_PER_USDC (16200), dibulatkan 2 desimal.
-const DEFAULT_CATALOG: { name: string; priceUsdc: number }[] = [
-  { name: "Kopi Susu Gula Aren", priceUsdc: 1.54 },
-  { name: "Croissant Butter", priceUsdc: 1.23 },
-  { name: "Nasi Goreng Spesial", priceUsdc: 2.47 },
-  { name: "Es Teh Manis", priceUsdc: 0.62 },
-  { name: "Air Mineral", priceUsdc: 0.37 },
-  { name: "Jus Alpukat", priceUsdc: 1.85 },
-];
-
 export default function MerchantPage() {
   const wallet = useWallet();
   const { address } = wallet;
@@ -136,14 +124,7 @@ export default function MerchantPage() {
     if (!address) return;
     setCatalogLoading(true);
     try {
-      let items = await getCatalog(address);
-      // Seed default catalog kalau kosong (hanya sekali per wallet)
-      if (items.length === 0) {
-        for (const item of DEFAULT_CATALOG) {
-          await addCatalogItem(address, item.name, item.priceUsdc);
-        }
-        items = await getCatalog(address);
-      }
+      const items = await getCatalog(address);
       setCatalog(items);
     } catch (err) {
       console.error("Failed to load catalog:", err);
