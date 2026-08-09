@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { MetaMaskProvider, useSDK } from "@metamask/sdk-react";
+import MetaMaskSDK from "@metamask/sdk";
 import {
   ARC_TESTNET_CHAIN_ID_HEX,
   ARC_TESTNET_PARAMS,
@@ -88,10 +88,9 @@ function isMobileUserAgent() {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-// ── Inner provider (child of MetaMaskProvider) ──
+// ── WalletProvider ──
 
-function WalletProviderInner({ children }: { children: React.ReactNode }) {
-  const { sdk, provider, account, chainId, connected, status } = useSDK();
+export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WalletState>({
     address: null,
     chainIdHex: null,
@@ -100,115 +99,97 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
     error: null,
   });
   const [isMobile, setIsMobile] = useState(false);
+  const mmSdkRef = useRef<MetaMaskSDK | null>(null);
+  const mmProviderRef = useRef<EipProvider | null>(null);
   const prevMmConnected = useRef(false);
+  const mmInitRef = useRef(false);
 
   useEffect(() => {
     setIsMobile(isMobileUserAgent());
   }, []);
 
-  // Sync MetaMask SDK state
+  // Initialize MetaMask SDK once
   useEffect(() => {
-    if (state.walletId !== "metamask") return;
+    if (mmInitRef.current) return;
+    mmInitRef.current = true;
 
-    if (connected && account && !prevMmConnected.current) {
-      prevMmConnected.current = true;
-      setState({
-        address: account,
-        chainIdHex: chainId ?? null,
-        walletId: "metamask",
-        status: "connected",
-        error: null,
-      });
-      window.localStorage.setItem(STORAGE_KEY, "metamask");
-    }
+    const hostname = typeof window !== "undefined" ? window.location.host : "mynota-delta.vercel.app";
 
-    if (!connected && prevMmConnected.current) {
-      prevMmConnected.current = false;
-      setState({
-        address: null,
-        chainIdHex: null,
-        walletId: null,
-        status: "idle",
-        error: null,
-      });
-    }
-  }, [connected, account, chainId, state.walletId]);
+    const sdk = new MetaMaskSDK({
+      dappMetadata: {
+        name: "Nota",
+        url: hostname,
+      },
+      useDeeplink: true,
+      headless: true,
+      checkInstallationImmediately: false,
+      injectProvider: false,
+      logging: {
+        sdk: false,
+      },
+    });
 
-  // Listen for MetaMask SDK provider events
-  useEffect(() => {
-    if (state.walletId !== "metamask" || !provider) return;
-
-    const onAccountsChanged = (accounts: unknown) => {
-      const list = accounts as string[];
-      if (list.length === 0) {
-        setState({
-          address: null,
-          chainIdHex: null,
-          walletId: null,
-          status: "idle",
-          error: null,
-        });
-        window.localStorage.removeItem(STORAGE_KEY);
-        prevMmConnected.current = false;
-      } else {
-        setState((s) => ({ ...s, address: list[0] ?? null }));
+    // Init the SDK (this sets up the provider and communication layer)
+    // sdk.init() returns a promise but we don't need to await it here
+    sdk.init().then(() => {
+      const provider = sdk.getProvider() as unknown as EipProvider | undefined;
+      if (provider) {
+        mmProviderRef.current = provider;
       }
-    };
 
-    const onChainChanged = (chainIdHex: unknown) => {
-      setState((s) => ({ ...s, chainIdHex: chainIdHex as string }));
-    };
+      // Listen for provider events
+      provider?.on?.("accountsChanged", (accounts: unknown) => {
+        const list = accounts as string[];
+        if (list.length === 0) {
+          setState({
+            address: null,
+            chainIdHex: null,
+            walletId: null,
+            status: "idle",
+            error: null,
+          });
+          window.localStorage.removeItem(STORAGE_KEY);
+          prevMmConnected.current = false;
+        } else {
+          setState((s) => ({ ...s, address: list[0] ?? null }));
+        }
+      });
 
-    provider.on?.("accountsChanged", onAccountsChanged);
-    provider.on?.("chainChanged", onChainChanged);
+      provider?.on?.("chainChanged", (chainIdHex: unknown) => {
+        setState((s) => ({ ...s, chainIdHex: chainIdHex as string }));
+      });
 
-    return () => {
-      provider.removeListener?.("accountsChanged", onAccountsChanged);
-      provider.removeListener?.("chainChanged", onChainChanged);
-    };
-  }, [state.walletId, provider]);
-
-  // Subscribe to non-MetaMask wallet provider events
-  useEffect(() => {
-    if (!state.walletId || state.walletId === "metamask") return;
-
-    const p = resolveProvider(state.walletId);
-    if (!p?.on) return;
-
-    const onAccountsChanged = (accounts: unknown) => {
-      const list = accounts as string[];
-      if (list.length === 0) {
-        setState({
-          address: null,
-          chainIdHex: null,
-          walletId: null,
-          status: "idle",
-          error: null,
-        });
-        window.localStorage.removeItem(STORAGE_KEY);
-      } else {
-        setState((s) => ({ ...s, address: list[0] ?? null }));
+      // Auto-reconnect if previously connected
+      const last = window.localStorage.getItem(STORAGE_KEY);
+      if (last === "metamask") {
+        provider
+          ?.request({ method: "eth_accounts" })
+          .then((accounts) => {
+            const list = accounts as string[];
+            if (list.length > 0) {
+              setState({
+                address: list[0] ?? null,
+                chainIdHex: null,
+                walletId: "metamask",
+                status: "connected",
+                error: null,
+              });
+              prevMmConnected.current = true;
+            }
+          })
+          .catch(() => {});
       }
-    };
+    });
 
-    const onChainChanged = (chainIdHex: unknown) => {
-      setState((s) => ({ ...s, chainIdHex: chainIdHex as string }));
-    };
-
-    p.on("accountsChanged", onAccountsChanged);
-    p.on("chainChanged", onChainChanged);
-
-    return () => {
-      p.removeListener?.("accountsChanged", onAccountsChanged);
-      p.removeListener?.("chainChanged", onChainChanged);
-    };
-  }, [state.walletId]);
+    mmSdkRef.current = sdk;
+  }, []);
 
   const switchToArc = useCallback(async () => {
     if (!state.walletId) throw new Error("no_wallet");
 
     // MetaMask: use SDK provider
     if (state.walletId === "metamask") {
+      const provider = mmProviderRef.current;
       if (!provider) throw new Error("no_provider");
       try {
         await provider.request({
@@ -249,73 +230,13 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
         throw err;
       }
     }
-  }, [state.walletId, provider]);
+  }, [state.walletId]);
 
-  const connect = useCallback(
-    async (id: WalletId) => {
-      // MetaMask → use SDK sdk.connect() (handles deeplink on mobile, extension on desktop)
-      if (id === "metamask") {
-        setState((s) => ({
-          ...s,
-          status: "connecting",
-          error: null,
-          walletId: id,
-        }));
-
-        // Wait for SDK to be ready
-        let attempts = 0;
-        while (!sdk && attempts < 10) {
-          await new Promise((r) => setTimeout(r, 500));
-          attempts++;
-        }
-
-        if (!sdk) {
-          setState((s) => ({
-            ...s,
-            status: "error",
-            error: "not_found",
-          }));
-          return;
-        }
-
-        try {
-          // sdk.connect() handles:
-          // - Desktop: MetaMask extension popup
-          // - Mobile: deeplink to MetaMask app → sign → return to Chrome
-          const accounts = (await sdk.connect()) as string[];
-
-          if (accounts && accounts.length > 0) {
-            const chainIdHex = provider
-              ? ((await provider.request({
-                  method: "eth_chainId",
-                })) as string)
-              : null;
-
-            setState({
-              address: accounts[0] ?? null,
-              chainIdHex,
-              walletId: id,
-              status: "connected",
-              error: null,
-            });
-            window.localStorage.setItem(STORAGE_KEY, id);
-            prevMmConnected.current = true;
-          }
-        } catch (err) {
-          const code = (err as { code?: number })?.code;
-          if (code === 4001) {
-            setState((s) => ({ ...s, status: "error", error: "rejected" }));
-          } else {
-            setState((s) => ({ ...s, status: "error", error: "rejected" }));
-          }
-        }
-        return;
-      }
-
-      // Non-MetaMask wallets: injected provider only
-      const p = resolveProvider(id);
-
-      if (!p) {
+  const connect = useCallback(async (id: WalletId) => {
+    // MetaMask → use SDK connect()
+    if (id === "metamask") {
+      const sdk = mmSdkRef.current;
+      if (!sdk) {
         setState((s) => ({ ...s, status: "error", error: "not_found" }));
         return;
       }
@@ -328,27 +249,75 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       }));
 
       try {
-        const accounts = (await p.request({
-          method: "eth_requestAccounts",
-        })) as string[];
-        const chainIdHex = (await p.request({
-          method: "eth_chainId",
-        })) as string;
+        // sdk.connect() handles:
+        // - Desktop: MetaMask extension popup (auto-detected)
+        // - Mobile: deeplink to MetaMask app → sign → return to Chrome
+        const accounts = (await sdk.connect()) as string[];
 
-        setState({
-          address: accounts[0] ?? null,
-          chainIdHex,
-          walletId: id,
-          status: "connected",
-          error: null,
-        });
-        window.localStorage.setItem(STORAGE_KEY, id);
-      } catch {
-        setState((s) => ({ ...s, status: "error", error: "rejected" }));
+        if (accounts && accounts.length > 0) {
+          const provider = mmProviderRef.current;
+          const chainIdHex = provider
+            ? ((await provider.request({
+                method: "eth_chainId",
+              })) as string)
+            : null;
+
+          setState({
+            address: accounts[0] ?? null,
+            chainIdHex,
+            walletId: id,
+            status: "connected",
+            error: null,
+          });
+          window.localStorage.setItem(STORAGE_KEY, id);
+          prevMmConnected.current = true;
+        }
+      } catch (err) {
+        const code = (err as { code?: number })?.code;
+        if (code === 4001) {
+          setState((s) => ({ ...s, status: "error", error: "rejected" }));
+        } else {
+          setState((s) => ({ ...s, status: "error", error: "rejected" }));
+        }
       }
-    },
-    [sdk, provider]
-  );
+      return;
+    }
+
+    // Non-MetaMask wallets: injected provider only
+    const p = resolveProvider(id);
+
+    if (!p) {
+      setState((s) => ({ ...s, status: "error", error: "not_found" }));
+      return;
+    }
+
+    setState((s) => ({
+      ...s,
+      status: "connecting",
+      error: null,
+      walletId: id,
+    }));
+
+    try {
+      const accounts = (await p.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+      const chainIdHex = (await p.request({
+        method: "eth_chainId",
+      })) as string;
+
+      setState({
+        address: accounts[0] ?? null,
+        chainIdHex,
+        walletId: id,
+        status: "connected",
+        error: null,
+      });
+      window.localStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      setState((s) => ({ ...s, status: "error", error: "rejected" }));
+    }
+  }, []);
 
   const disconnect = useCallback(() => {
     window.localStorage.removeItem(STORAGE_KEY);
@@ -362,27 +331,11 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Quietly reconnect on page load
+  // Quietly reconnect non-MetaMask wallets on page load
   useEffect(() => {
     const last = window.localStorage.getItem(STORAGE_KEY) as WalletId | null;
-    if (!last || !VALID_IDS.includes(last)) return;
+    if (!last || !VALID_IDS.includes(last) || last === "metamask") return;
 
-    if (last === "metamask") {
-      // MetaMask SDK handles reconnection internally
-      if (connected && account) {
-        prevMmConnected.current = true;
-        setState({
-          address: account,
-          chainIdHex: chainId ?? null,
-          walletId: "metamask",
-          status: "connected",
-          error: null,
-        });
-      }
-      return;
-    }
-
-    // Other wallets: check accounts silently
     const p = resolveProvider(last);
     if (!p) return;
     p.request({ method: "eth_accounts" })
@@ -394,11 +347,11 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, account, chainId]);
+  }, []);
 
   const isProviderAvailable = useCallback((id: WalletId) => {
     if (id === "metamask") {
-      // MetaMask is always available — SDK handles both extension and mobile deeplink
+      // MetaMask SDK handles both extension and mobile deeplink
       return true;
     }
     return Boolean(resolveProvider(id));
@@ -416,48 +369,10 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       disconnect,
       switchToArc,
     }),
-    [
-      state,
-      isCorrectNetwork,
-      isProviderAvailable,
-      isMobile,
-      connect,
-      disconnect,
-      switchToArc,
-    ]
+    [state, isCorrectNetwork, isProviderAvailable, isMobile, connect, disconnect, switchToArc]
   );
 
-  return (
-    <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
-  );
-}
-
-// ── Outer provider (wraps with MetaMaskProvider) ──
-
-export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [hostname] = useState(() => {
-    if (typeof window === "undefined") return "mynota-delta.vercel.app";
-    return window.location.host;
-  });
-
-  return (
-    <MetaMaskProvider
-      debug={false}
-      sdkOptions={{
-        dappMetadata: {
-          name: "Nota",
-          url: hostname,
-        },
-        // No Infura key — we use Arc Testnet, not Ethereum mainnet
-        infuraAPIKey: undefined,
-        // Use deeplink on mobile — opens MetaMask app, then returns to browser
-        useDeeplink: true,
-        // Defaults: communication layer for mobile, extension for desktop
-      }}
-    >
-      <WalletProviderInner>{children}</WalletProviderInner>
-    </MetaMaskProvider>
-  );
+  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }
 
 export function useWallet() {
