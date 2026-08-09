@@ -35,11 +35,16 @@ import {
   Wallet,
   Package,
   Receipt,
+  RefreshCcw,
+  QrCode,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
-// Simulasi kurs IDR → USDC (sama seperti yang dipakai di cart sekarang)
 const IDR_TO_USDC_RATE = 16200;
+
+// Format helpers
+const formatIDR = (num: number) => `Rp ${num.toLocaleString("id-ID")}`;
+const formatUSDC = (num: number) => `${num.toFixed(2)} USDC`;
 
 function generateNonce() {
   return Math.random().toString(36).substring(2, 15);
@@ -53,15 +58,29 @@ function encodeQR(data: Record<string, unknown>): string {
   }
 }
 
+// Default catalog items (akan di-seed ke Supabase kalau catalog kosong)
+const DEFAULT_CATALOG: { name: string; priceIdr: number }[] = [
+  { name: "Kopi Susu Gula Aren", priceIdr: 25000 },
+  { name: "Croissant Butter", priceIdr: 20000 },
+  { name: "Nasi Goreng Spesial", priceIdr: 40000 },
+  { name: "Es Teh Manis", priceIdr: 10000 },
+  { name: "Air Mineral", priceIdr: 6000 },
+  { name: "Jus Alpukat", priceIdr: 30000 },
+];
+
 export default function MerchantPage() {
   const wallet = useWallet();
   const { address } = wallet;
   const { t } = useLanguage();
 
+  // UI State
+  const [currencyMode, setCurrencyMode] = useState<"IDR" | "USDC">("IDR");
+
   // Catalog state
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(false);
 
   // Cart state
@@ -90,10 +109,18 @@ export default function MerchantPage() {
     if (!address) return;
     setCatalogLoading(true);
     try {
-      const items = await getCatalog(address);
+      let items = await getCatalog(address);
+      // Seed default catalog kalau kosong (hanya sekali per wallet)
+      if (items.length === 0) {
+        for (const item of DEFAULT_CATALOG) {
+          await addCatalogItem(address, item.name, item.priceIdr);
+        }
+        items = await getCatalog(address);
+      }
       setCatalog(items);
     } catch (err) {
       console.error("Failed to load catalog:", err);
+      setError("Failed to load catalog. Check Supabase connection.");
     } finally {
       setCatalogLoading(false);
     }
@@ -106,7 +133,7 @@ export default function MerchantPage() {
       const items = await getCart(address);
       setCart(items);
     } catch (err) {
-      console.error("Failed to load cart:", err);
+console.error("Failed to load cart:", err);
     } finally {
       setCartLoading(false);
     }
@@ -125,15 +152,25 @@ export default function MerchantPage() {
   // Cart calculations
   const cartTotalIDR = cart.reduce((sum, item) => sum + item.price_idr * item.qty, 0);
   const cartTotalUSDC = cartTotalIDR / IDR_TO_USDC_RATE;
+  const formattedTotal =
+    currencyMode === "IDR" ? formatIDR(cartTotalIDR) : formatUSDC(cartTotalUSDC);
+
+  const toggleCurrency = () => {
+    setCurrencyMode((m) => (m === "IDR" ? "USDC" : "IDR"));
+  };
 
   // Add item to catalog
   async function handleAddToCatalog(e: React.FormEvent) {
     e.preventDefault();
     if (!address || !newItemName.trim() || !newItemPrice.trim()) return;
+    const priceNum = parseFloat(newItemPrice.replace(/[^0-9.]/g, ""));
+    if (isNaN(priceNum) || priceNum <= 0) return;
+    const priceIdr = currencyMode === "USDC" ? priceNum * IDR_TO_USDC_RATE : priceNum;
     try {
-      await addCatalogItem(address, newItemName.trim(), parseFloat(newItemPrice));
+      await addCatalogItem(address, newItemName.trim(), priceIdr);
       setNewItemName("");
       setNewItemPrice("");
+      setIsAdding(false);
       await loadCatalog();
     } catch (err) {
       setError("Failed to add item to catalog");
@@ -141,7 +178,6 @@ export default function MerchantPage() {
     }
   }
 
-// Add item from catalog to cart
   async function handleAddToCart(item: CatalogItem) {
     if (!address) return;
     try {
@@ -153,7 +189,6 @@ export default function MerchantPage() {
     }
   }
 
-  // Update cart quantity
   async function handleUpdateQty(item: CartItem, delta: number) {
     const newQty = item.qty + delta;
     if (newQty < 1) return;
@@ -165,10 +200,19 @@ export default function MerchantPage() {
     }
   }
 
-  // Remove from cart
   async function handleRemoveFromCart(id: string) {
     try {
       await removeFromCart(id);
+      await loadCart();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleClearCart() {
+    if (!address) return;
+    try {
+      await clearCart(address);
       await loadCart();
     } catch (err) {
       console.error(err);
@@ -186,12 +230,12 @@ export default function MerchantPage() {
     }));
 
     const qrPayload = {
-      payerAddress: address, // Payer = merchant (yang generate QR)
-      totalAmount: (parseFloat(totalUsdc) * 1_000_000).toFixed(0), // in 6 decimals
+      payerAddress: address,
+      totalAmount: (parseFloat(totalUsdc) * 1_000_000).toFixed(0),
       items: itemsForQR,
       category: "belanja",
       timestamp: Date.now(),
-      expiresAt: Date.now() + 5 * 60 * 1000, // 5 menit
+      expiresAt: Date.now() + 5 * 60 * 1000,
       nonce,
     };
 
@@ -201,7 +245,7 @@ export default function MerchantPage() {
     setError("");
   }
 
-  // Simulate payment received (in real app, this would be from webhook/on-chain listener)
+  // Simulate payment received (for testing)
   async function handleSimulatePayment() {
     if (!address || !qrData) return;
     try {
@@ -233,296 +277,382 @@ export default function MerchantPage() {
 
   if (!address) {
     return (
-      <section className="relative mx-auto max-w-4xl px-5 py-24">
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-ink-line/40 bg-ink-2/30 p-12 text-center">
-          <Wallet className="h-12 w-12 text-text-muted" />
-          <h2 className="mt-4 font-display text-xl font-semibold">Connect Wallet First</h2>
-          <p className="mt-2 text-sm text-text-muted">Connect your wallet to access POS features.</p>
-        </div>
-      </section>
+      <>
+<div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-bg to-bg" />
+        <section className="relative min-h-[100svh] overflow-hidden px-5 pb-16 pt-28 sm:px-8 md:pt-36">
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-ink-line/40 bg-ink-2/30 p-12 text-center">
+              <Wallet className="h-12 w-12 text-text-muted" />
+              <h2 className="mt-4 font-display text-xl font-semibold">Connect Wallet First</h2>
+              <p className="mt-2 text-sm text-text-muted">Connect your wallet to access POS features.</p>
+            </div>
+          </div>
+        </section>
+      </>
     );
   }
 
   return (
-    <section className="relative mx-auto max-w-4xl px-5 py-12">
-      {/* Header */}
-      <div className="mb-8 flex items-center gap-3">
-        <div className="inline-flex items-center gap-2 rounded-full border border-ink-line/40 bg-ink-2/50 px-3 py-1 text-[11px] font-mono uppercase tracking-widest text-text-muted">
-          <Store className="h-3 w-3" />
-          Merchant POS
-        </div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Point of Sale</h1>
-      </div>
-
-      {error && (
-        <div className="mb-6 flex items-center gap-2 rounded-xl border border-warn-amber/40 bg-warn-amber/10 px-4 py-3 text-sm text-warn-amber">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left: Catalog */}
-        <div className="space-y-6">
-<div className="rounded-2xl border border-ink-line/40 bg-ink-2/30 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Package className="h-4 w-4 text-accent" />
-              <h3 className="font-display text-sm font-semibold">Product Catalog</h3>
+    <>
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-bg to-bg" />
+      <section className="relative min-h-[100svh] overflow-hidden px-5 pb-16 pt-28 sm:px-8 md:pt-36">
+        <div className="mx-auto w-full max-w-6xl">
+          {/* Header */}
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.30em] text-primary">Merchant POS</p>
+              <h1 className="mt-3 text-balance text-4xl font-black tracking-tight text-text sm:text-5xl">
+                Point of Sale
+              </h1>
+              <p className="mt-4 text-base leading-relaxed text-text-secondary">
+                Manage your catalog and cart, generate QR codes for instant payments.
+              </p>
             </div>
-
-            {/* Add new item form */}
-            <form onSubmit={handleAddToCatalog} className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                placeholder="Item name"
-                className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
-              />
-              <input
-                type="number"
-                value={newItemPrice}
-                onChange={(e) => setNewItemPrice(e.target.value)}
-                placeholder="Price IDR"
-                min="0"
-                step="1000"
-                className="w-28 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong transition-all"
+            {history.length > 0 && (
+              <a
+                href={`${ARC_EXPLORER_URL}/address/${address}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted transition-colors hover:bg-ink-2 hover:text-text"
               >
-                <Plus className="h-4 w-4" />
-              </button>
-            </form>
-
-            {/* Catalog list */}
-            {catalogLoading ? (
-              <div className="flex items-center justify-center py-8 text-text-muted">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : catalog.length === 0 ? (
-              <p className="text-sm text-text-muted text-center py-4">No items in catalog yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {catalog.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-xl border border-ink-line/30 bg-ink p-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-text-muted">Rp {item.price_idr.toLocaleString("id-ID")}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAddToCart(item)}
-                        className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-all"
-                      >
-                        <ShoppingCart className="h-3 w-3 inline mr-1" />
-                        Add
-                      </button>
-                      <button
-                        onClick={() => deleteCatalogItem(item.id).then(loadCatalog)}
-                        className="rounded-lg p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text transition-all"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                View all transactions <ExternalLink className="h-3 w-3" />
+              </a>
             )}
+          </div>
+
+          {error && (
+            <div className="mb-6 flex items-center gap-2 rounded-xl border border-warn-amber/40 bg-warn-amber/10 px-4 py-3 text-sm text-warn-amber">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Left: Catalog */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  <h2 className="font-display text-lg font-semibold">Catalog</h2>
+                </div>
+                <button
+                  onClick={() => setIsAdding(!isAdding)}
+                  className="inline-flex items-center gap-1 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/20"
+                >
+                  <Plus className="h-3 w-3" />
+                  {isAdding ? "Cancel" : "Add Item"}
+                </button>
+              </div>
+
+              {/* Add item form */}
+              {isAdding && (
+                <form onSubmit={handleAddToCatalog} className="rounded-2xl border border-primary/30 bg-ink-2/50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      type="text"
+                      value={newItemName}
+                      onChange={(e) => setNewItemName(e.target.value)}
+                      placeholder="Item name"
+                      className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
+                    />
+<div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
+                        {currencyMode === "IDR" ? "Rp" : "$"}
+                      </span>
+                      <input
+                        type="text"
+                        value={newItemPrice}
+                        onChange={(e) => setNewItemPrice(e.target.value)}
+                        placeholder={currencyMode === "IDR" ? "25.000" : "1.50"}
+                        className="w-full rounded-xl border border-ink-line/40 bg-ink pl-10 pr-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-32"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Catalog items */}
+              <div className="space-y-2">
+                {catalogLoading ? (
+                  <div className="flex items-center justify-center py-12 text-text-muted">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : catalog.length === 0 ? (
+                  <div className="rounded-2xl border border-ink-line/30 bg-ink-2/20 p-8 text-center">
+                    <Package className="mx-auto h-10 w-10 text-text-muted/40" />
+                    <p className="mt-3 text-sm text-text-muted">No items in catalog yet. Add your first item above.</p>
+                  </div>
+                ) : (
+                  catalog.map((item) => (
+                    <div
+                      key={item.id}
+                      className="group flex items-center justify-between rounded-2xl border border-ink-line/30 bg-ink-2/20 p-4 transition-all hover:border-ink-line/60 hover:bg-ink-2/40"
+                    >
+                      <div>
+                        <p className="font-medium text-text">{item.name}</p>
+                        <p className="text-sm text-text-muted">
+                          {formatIDR(item.price_idr)}
+                          {currencyMode === "USDC" && ` ≈ ${formatUSDC(item.price_idr / IDR_TO_USDC_RATE)}`}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                        <button
+                          onClick={() => handleAddToCart(item)}
+                          className="rounded-xl bg-primary/10 p-2 text-primary transition-all hover:bg-primary/20"
+                          title="Add to cart"
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await deleteCatalogItem(item.id);
+                            await loadCatalog();
+                          }}
+                          className="rounded-xl p-2 text-text-muted transition-all hover:bg-ink-line/40 hover:text-text"
+                          title="Delete item"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Right: Cart */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-primary" />
+                  <h2 className="font-display text-lg font-semibold">Cart</h2>
+                </div>
+                <button
+                  onClick={toggleCurrency}
+className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40 px-3 py-1.5 text-xs font-medium text-text-muted transition-all hover:bg-ink-2 hover:text-text"
+                >
+                  <RefreshCcw className="h-3 w-3" />
+                  Show {currencyMode === "IDR" ? "USDC" : "IDR"}
+                </button>
+              </div>
+
+              <div className={cn("rounded-2xl border transition-all", cart.length === 0 ? "border-ink-line/30 bg-ink-2/20" : "border-primary/30 bg-primary/5")}> 
+                {cartLoading ? (
+                  <div className="flex items-center justify-center py-12 text-text-muted">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : cart.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <ShoppingCart className="h-10 w-10 text-text-muted/40" />
+                    <p className="mt-3 text-sm text-text-muted">Cart is empty.</p>
+                    <p className="mt-1 text-xs text-text-muted/70">Click items from the catalog to add them.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between border-b border-ink-line/20 p-4">
+                      <span className="text-sm font-semibold">Cart Items</span>
+                      <button
+                        onClick={handleClearCart}
+                        className="text-xs font-medium text-warn-amber hover:underline"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                    <div className="divide-y divide-ink-line/20">
+                      {cart.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-4">
+                          <div className="flex-1">
+                            <p className="font-medium text-text">{item.item_name}</p>
+                            <p className="text-sm text-text-muted">
+                              {currencyMode === "IDR"
+                                ? `${formatIDR(item.price_idr)} × ${item.qty}`
+                                : `${formatUSDC(item.price_idr / IDR_TO_USDC_RATE)} × ${item.qty}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1 rounded-xl border border-ink-line/40 bg-ink">
+                              <button
+                                onClick={() => handleUpdateQty(item, -1)}
+                                className="p-1.5 text-text-muted hover:text-text"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                              <span className="w-6 text-center text-sm font-medium">{item.qty}</span>
+                              <button
+                                onClick={() => handleUpdateQty(item, 1)}
+                                className="p-1.5 text-text-muted hover:text-text"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveFromCart(item.id)}
+                              className="rounded-xl p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Totals */}
+                    <div className="border-t border-ink-line/30 p-4">
+                      <div className="flex justify-between text-sm mb-2">
+<span className="text-text-muted">Subtotal</span>
+                        <span>{formatIDR(cartTotalIDR)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold">Total</span>
+                        <span className="font-bold text-primary">{formattedTotal}</span>
+                      </div>
+                      {currencyMode === "IDR" && (
+                        <div className="mt-1 text-right text-xs text-text-muted">
+                          ≈ {formatUSDC(cartTotalUSDC)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Generate QR button */}
+                    <div className="p-4 pt-0">
+                      <button
+                        onClick={handleGenerateQR}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-strong hover:shadow-lg hover:shadow-primary/20"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        Generate QR Code
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Right: Cart & Checkout */}
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-ink-line/40 bg-ink-2/30 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <ShoppingCart className="h-4 w-4 text-accent" />
-              <h3 className="font-display text-sm font-semibold">Cart</h3>
-            </div>
-
-            {cartLoading ? (
-              <div className="flex items-center justify-center py-8 text-text-muted">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : cart.length === 0 ? (
-              <p className="text-sm text-text-muted text-center py-4">Cart is empty.</p>
-            ) : (
-<div className="space-y-2 mb-4">
-                {cart.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-xl border border-ink-line/30 bg-ink p-3"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{item.item_name}</p>
-                      <p className="text-xs text-text-muted">
-                        Rp {item.price_idr.toLocaleString("id-ID")} × {item.qty} = Rp{" "}
-                        {(item.price_idr * item.qty).toLocaleString("id-ID")}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleUpdateQty(item, -1)}
-                        className="rounded-lg border border-ink-line/40 p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                      <span className="text-sm w-6 text-center">{item.qty}</span>
-                      <button
-                        onClick={() => handleUpdateQty(item, 1)}
-                        className="rounded-lg border border-ink-line/40 p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={() => handleRemoveFromCart(item.id)}
-                        className="rounded-lg p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Cart totals */}
-            <div className="border-t border-ink-line/30 pt-4 mb-4">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-text-muted">Subtotal</span>
-                <span>Rp {cartTotalIDR.toLocaleString("id-ID")}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-text-muted">Total (USDC)</span>
-                <span className="font-semibold">{cartTotalUSDC.toFixed(2)} USDC</span>
-              </div>
-            </div>
-
-            {/* Generate QR button */}
-            <button
-              onClick={handleGenerateQR}
-              disabled={cart.length === 0}
-              className={cn(
-                "w-full flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition-all",
-                "hover:bg-accent-strong hover:shadow-lg hover:shadow-accent/20",
-                "disabled:opacity-60 disabled:cursor-not-allowed"
-              )}
-            >
-              <Receipt className="h-4 w-4" />
-              Generate QR
-            </button>
-          </div>
-
-          {/* QR Display */}
-          {qrData && (
-            <div className="rounded-2xl border border-accent/40 bg-ink-2/30 p-6 text-center">
+        {/* QR Modal */}
+        {qrData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-primary/40 bg-ink p-6 shadow-2xl">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2 text-accent">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="text-sm font-semibold">Scan to Pay</span>
+                <div className="flex items-center gap-2 text-primary">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="font-semibold">Payment QR Code</span>
                 </div>
                 <button
                   onClick={() => setQrData(null)}
-                  className="rounded-lg p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
+                  className="rounded-xl p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
               <div className="flex justify-center mb-4">
-                <div className="rounded-xl bg-white p-4">
-                  <QRCodeSVG value={qrData} size={200} />
+                <div className="rounded-xl bg-white p-4 shadow-inner">
+                  <QRCodeSVG value={qrData} size={220} />
                 </div>
               </div>
 
-<p className="text-sm text-text-muted mb-2">Total: {cartTotalUSDC.toFixed(2)} USDC</p>
+              <div className="text-center mb-4">
+                <p className="text-2xl font-bold text-primary">{formattedTotal}</p>
+                {currencyMode === "IDR" && (
+                  <p className="text-sm text-text-muted">≈ {formatUSDC(cartTotalUSDC)}</p>
+                )}
+              </div>
+
               <button
                 onClick={() => { navigator.clipboard.writeText(qrData); }}
-                className="inline-flex items-center gap-1 rounded-lg border border-ink-line/40 px-3 py-1.5 text-xs text-text-muted hover:bg-ink-line/40 hover:text-text"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted hover:bg-ink-2 hover:text-text mb-3"
               >
-                <Copy className="h-3 w-3" />
+                <Copy className="h-4 w-4" />
                 Copy QR data
               </button>
 
-              {/* Simulate payment (for testing) */}
-              <div className="mt-4 pt-4 border-t border-ink-line/30">
-                <p className="text-xs text-text-muted mb-2">For testing:</p>
+              {/* Testing: simulate payment */}
+              <div className="border-t border-ink-line/30 pt-4">
+                <p className="text-xs text-text-muted text-center mb-2">For testing:</p>
                 <button
                   onClick={handleSimulatePayment}
-                  className="rounded-lg bg-stamp-green/10 px-4 py-2 text-sm font-medium text-stamp-green hover:bg-stamp-green/20 transition-all"
+                  className="w-full rounded-xl bg-stamp-green/10 px-4 py-2 text-sm font-medium text-stamp-green hover:bg-stamp-green/20 transition-all"
                 >
                   Simulate Payment Received
                 </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Success state */}
-          {successTx && (
-            <div className="rounded-2xl border border-stamp-green/40 bg-stamp-green/5 p-6 text-center">
-              <CheckCircle2 className="mx-auto h-10 w-10 text-stamp-green mb-2" />
-              <h3 className="font-display text-lg font-semibold">Payment Received!</h3>
-              <p className="text-sm text-text-muted mt-1">
-                {successTx.amount.toFixed(2)} USDC received
+        {/* Success Modal */}
+        {successTx && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-stamp-green/40 bg-ink p-8 text-center shadow-2xl">
+<CheckCircle2 className="mx-auto h-12 w-12 text-stamp-green mb-4" />
+              <h3 className="font-display text-xl font-semibold">Payment Received!</h3>
+              <p className="mt-2 text-text-muted">
+                {formatUSDC(successTx.amount)} received successfully.
               </p>
               <a
                 href={`${ARC_EXPLORER_URL}/tx/${successTx.tx_hash}`}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-xs text-accent hover:text-accent-strong"
+                className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline"
               >
                 View on explorer <ExternalLink className="h-3 w-3" />
               </a>
               <button
                 onClick={() => setSuccessTx(null)}
-                className="mt-4 w-full rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted hover:bg-ink-2 hover:text-text transition-all"
+                className="mt-6 w-full rounded-xl border border-ink-line/40 px-4 py-3 text-sm font-medium text-text-muted hover:bg-ink-2 hover:text-text transition-all"
               >
-                New Transaction
+                Done
               </button>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {/* Recent Transactions */}
-      {history.length > 0 && (
-        <div className="mt-8">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="h-4 w-4 text-text-muted" />
-            <h3 className="font-display text-sm font-semibold">Recent Transactions</h3>
-          </div>
-          <div className="space-y-2">
-            {history.slice(0, 5).map((tx) => (
-              <div
-                key={tx.id}
-                className="flex items-center justify-between rounded-xl border border-ink-line/30 bg-ink p-4"
-              >
-                <div>
-                  <p className="text-sm font-medium capitalize">{tx.category}</p>
-                  <p className="text-xs text-text-muted">
-                    {new Date(tx.created_at).toLocaleDateString("id-ID", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
+        {/* History */}
+        {history.length > 0 && (
+          <div className="mx-auto mt-12 w-full max-w-6xl">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="h-5 w-5 text-text-muted" />
+              <h2 className="font-display text-lg font-semibold">Recent Transactions</h2>
+            </div>
+            <div className="space-y-2">
+              {history.slice(0, 10).map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between rounded-2xl border border-ink-line/30 bg-ink-2/20 p-4 transition-all hover:border-ink-line/60 hover:bg-ink-2/40"
+                >
+                  <div>
+                    <p className="font-medium capitalize">{tx.category}</p>
+                    <p className="text-sm text-text-muted">
+                      {new Date(tx.created_at).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {" · "}
+                      <span className="font-mono text-xs">{tx.payee_address.slice(0, 10)}…</span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">{formatUSDC(tx.amount)}</p>
+                    <p className={cn("text-xs capitalize", tx.status === "confirmed" ? "text-stamp-green" : tx.status === "failed" ? "text-warn-amber" : "text-text-muted")}>
+                      {tx.status}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">{tx.amount.toFixed(2)} USDC</p>
-                  <p className={cn("text-xs capitalize", tx.status === "confirmed" ? "text-stamp-green" : tx.status === "failed" ? "text-warn-amber" : "text-text-muted")}>
-                    {tx.status}
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </section>
+        )}
+      </section>
+    </>
   );
 }

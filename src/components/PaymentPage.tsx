@@ -237,8 +237,8 @@ const unsub = subscribeToTransactions(() => loadHistory());
           <ScanLine className="h-3 w-3" />
           {t("payment.eyebrow")}
         </div>
-        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">{t("payment.title")}</h1>
-        <p className="mt-2 text-text-muted">{t("payment.desc")}</p>
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">Scan & Pay</h1>
+        <p className="mt-2 text-text-muted">Scan a QR code to complete your payment on-chain.</p>
       </div>
 
       {/* Error banner */}
@@ -354,8 +354,8 @@ const unsub = subscribeToTransactions(() => loadHistory());
       ) : (
         /* Scan QR section */
         <div className="rounded-2xl border border-ink-line/40 bg-ink-2/30 p-6">
-          <h3 className="font-display text-sm font-semibold">{t("payment.scanQR")}</h3>
-          <p className="mt-1 text-xs text-text-muted">{t("payment.scanDesc")}</p>
+          <h3 className="font-display text-sm font-semibold">Scan QR Code</h3>
+          <p className="mt-1 text-xs text-text-muted">Point your camera at a payment QR code, or paste the QR data below.</p>
           <div className="mt-4 flex gap-3">
             <button
               onClick={() => setCameraOpen(true)}
