@@ -49,10 +49,10 @@ export function Nav() {
   }, []);
 
   const featureItems = [
-    { icon: CreditCard, title: t("nav.payment"), desc: t("features.payment.desc"), href: "/payment" },
-    { icon: Store, title: t("nav.merchant"), desc: t("features.merchant.desc"), href: "/merchant" },
-    { icon: BarChart3, title: t("nav.analisa"), desc: t("features.analisa.desc"), href: "/analisa" },
-    { icon: TrendingUp, title: t("nav.forecast"), desc: t("features.forecast.desc"), href: "/forecast" },
+    { icon: CreditCard, title: t("nav.payment"), href: "/payment" },
+    { icon: Store, title: t("nav.merchant"), href: "/merchant" },
+    { icon: BarChart3, title: t("nav.analisa"), href: "/analisa" },
+    { icon: TrendingUp, title: t("nav.forecast"), href: "/forecast" },
   ];
 
   const docsItems = [
@@ -111,7 +111,6 @@ export function Nav() {
                     </div>
                     <div className="flex-1">
                       <span className="text-sm font-medium text-text">{item.title}</span>
-                      <p className="mt-0.5 text-xs text-text-muted line-clamp-1">{item.desc}</p>
                     </div>
                     <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:text-text-muted" />
                   </Link>
