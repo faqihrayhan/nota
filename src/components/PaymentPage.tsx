@@ -139,7 +139,7 @@ function PaymentPageInner() {
     setTab("bayar");
     // Prefill items list by parsing "2x Item A, 1x Item B"
     if (itemsParam) {
-      const parsed: PaymentItem[] = itemsParam
+      const parsed = itemsParam
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
