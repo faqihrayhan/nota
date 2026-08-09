@@ -114,7 +114,8 @@ export default function PaymentPage() {
 }
 
 function PaymentPageInner() {
-  const { address, isCorrectNetwork } = useWallet();
+  const wallet = useWallet();
+  const { address, isCorrectNetwork } = wallet;
   const { t } = useLanguage();
   const searchParams = useSearchParams();
   const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
@@ -124,6 +125,7 @@ function PaymentPageInner() {
     { name: "", price: "" },
   ]);
   const [category, setCategory] = useState("makan");
+  const [qrData, setQrData] = useState<QRData | null>(null);
   const [qrSvg, setQrSvg] = useState<string>("");
   const [qrRaw, setQrRaw] = useState<string>("");
   const [merchantPrefill, setMerchantPrefill] = useState<{ items: string; amount: string } | null>(null);
@@ -310,7 +312,7 @@ function PaymentPageInner() {
   };
 
 // Perbaikan fungsi handleTransferFrom di src/components/PaymentPage.tsx sesuai docs.arc.io:
-const confirmTransfer = async () => {
+const handleTransferFrom = async () => {
   if (!scannedData || !wallet.address) return;
   setError("");
   setTransferring(true);
