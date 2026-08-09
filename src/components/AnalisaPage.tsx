@@ -87,6 +87,7 @@ export default function AnalisaPage() {
   const DEMO_TRANSACTIONS: Transaction[] = [
     {
       id: "demo-1",
+      wallet_address: "0xdemo0000000000000000000000000000000001",
       payer_address: "0xdemo...1234",
       payee_address: "0xshop...5678",
       amount: 4.5,
@@ -101,6 +102,7 @@ export default function AnalisaPage() {
     },
     {
       id: "demo-2",
+      wallet_address: "0xdemo0000000000000000000000000000000001",
       payer_address: "0xdemo...1234",
       payee_address: "0xstore...9999",
       amount: 12.0,
