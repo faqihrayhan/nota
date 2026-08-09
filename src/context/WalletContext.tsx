@@ -253,28 +253,8 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
 
   const connect = useCallback(
     async (id: WalletId) => {
-      // MetaMask → use SDK provider.request (handles deeplink on mobile, extension on desktop)
+      // MetaMask → use SDK sdk.connect() (handles deeplink on mobile, extension on desktop)
       if (id === "metamask") {
-        if (!provider) {
-          // On mobile, SDK might still be initializing — show connecting
-          setState((s) => ({
-            ...s,
-            status: "connecting",
-            error: null,
-            walletId: id,
-          }));
-          // Retry once after a short delay
-          await new Promise((r) => setTimeout(r, 1000));
-          if (!provider) {
-            setState((s) => ({
-              ...s,
-              status: "error",
-              error: "not_found",
-            }));
-            return;
-          }
-        }
-
         setState((s) => ({
           ...s,
           status: "connecting",
@@ -282,18 +262,34 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
           walletId: id,
         }));
 
+        // Wait for SDK to be ready
+        let attempts = 0;
+        while (!sdk && attempts < 10) {
+          await new Promise((r) => setTimeout(r, 500));
+          attempts++;
+        }
+
+        if (!sdk) {
+          setState((s) => ({
+            ...s,
+            status: "error",
+            error: "not_found",
+          }));
+          return;
+        }
+
         try {
-          // eth_requestAccounts on the SDK provider triggers:
+          // sdk.connect() handles:
           // - Desktop: MetaMask extension popup
           // - Mobile: deeplink to MetaMask app → sign → return to Chrome
-          const accounts = (await provider.request({
-            method: "eth_requestAccounts",
-          })) as string[];
+          const accounts = (await sdk.connect()) as string[];
 
           if (accounts && accounts.length > 0) {
-            const chainIdHex = (await provider.request({
-              method: "eth_chainId",
-            })) as string;
+            const chainIdHex = provider
+              ? ((await provider.request({
+                  method: "eth_chainId",
+                })) as string)
+              : null;
 
             setState({
               address: accounts[0] ?? null,
@@ -351,7 +347,7 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
         setState((s) => ({ ...s, status: "error", error: "rejected" }));
       }
     },
-    [provider]
+    [sdk, provider]
   );
 
   const disconnect = useCallback(() => {
