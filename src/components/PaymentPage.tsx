@@ -31,6 +31,7 @@ import {
   ExternalLink,
   Wallet,
   FileText,
+  XCircle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
