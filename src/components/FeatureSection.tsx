@@ -121,7 +121,7 @@ export function FeatureSection() {
                         "mt-1 block text-[10px] font-mono uppercase tracking-[0.2em] text-accent font-medium h-4",
                         activeTab.id === p.id ? "opacity-100" : "opacity-0"
                       )}>
-                        {p.active ? `${t("features.core")} ${String(i + 1).padStart(2, "0")}` : t("features.comingSoon")}
+                        {p.active ? "" : t("features.comingSoon")}
                       </span>
                     </div>
 
