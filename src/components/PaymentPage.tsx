@@ -129,15 +129,14 @@ function PaymentPageInner() {
   const [merchantPrefill, setMerchantPrefill] = useState<{ items: string; amount: string } | null>(null);
 
   // Read query params from /merchant (?source=merchant&items=...&amount=...)
-  const searchParams = useSearchParams();
   useEffect(() => {
     if (searchParams.get("source") !== "merchant") return;
     const itemsParam = searchParams.get("items") ?? "";
     const amountParam = searchParams.get("amount") ?? "";
     if (!itemsParam && !amountParam) return;
     setMerchantPrefill({ items: itemsParam, amount: amountParam });
-    // Switch to create tab so cashier can review & generate QR directly.
-    setTab("create");
+    // Switch to bayar tab so cashier can review & generate QR directly.
+    setTab("bayar");
     // Prefill items list by parsing "2x Item A, 1x Item B"
     if (itemsParam) {
       const parsed: PaymentItem[] = itemsParam
