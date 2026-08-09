@@ -134,7 +134,7 @@ export default function MerchantPage() {
       setCatalog(items);
     } catch (err) {
       console.error("Failed to load catalog:", err);
-      setError("Failed to load catalog. Check Supabase connection.");
+      setError(t("merchant.failedToLoadCatalog"));
     } finally {
       setCatalogLoading(false);
     }
@@ -187,7 +187,7 @@ console.error("Failed to load cart:", err);
       setIsAdding(false);
       await loadCatalog();
     } catch (err) {
-      setError("Failed to add item to catalog");
+      setError(t("merchant.failedToAddItem"));
       console.error(err);
     }
   }
@@ -198,7 +198,7 @@ console.error("Failed to load cart:", err);
       await addToCart(address, item.name, 1, item.price_idr);
       await loadCart();
     } catch (err) {
-      setError("Failed to add to cart");
+      setError(t("merchant.failedToAddToCart"));
       console.error(err);
     }
   }
@@ -284,7 +284,7 @@ console.error("Failed to load cart:", err);
       await loadCart();
       await loadHistory();
     } catch (err) {
-      setError("Failed to record transaction");
+      setError(t("merchant.failedToRecordTx"));
       console.error(err);
     }
   }
@@ -297,8 +297,8 @@ console.error("Failed to load cart:", err);
           <div className="mx-auto w-full max-w-6xl">
             <div className="flex flex-col items-center justify-center rounded-2xl border border-ink-line/40 bg-ink-2/30 p-12 text-center">
               <Wallet className="h-12 w-12 text-text-muted" />
-              <h2 className="mt-4 font-display text-xl font-semibold">Connect Wallet First</h2>
-              <p className="mt-2 text-sm text-text-muted">Connect your wallet to access POS features.</p>
+              <h2 className="mt-4 font-display text-xl font-semibold">{t("merchant.connectFirst")}</h2>
+              <p className="mt-2 text-sm text-text-muted">{t("merchant.connectDesc")}</p>
             </div>
           </div>
         </section>
@@ -314,12 +314,12 @@ console.error("Failed to load cart:", err);
           {/* Header */}
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.30em] text-primary">Merchant POS</p>
+              <p className="text-xs font-bold uppercase tracking-[0.30em] text-primary">{t("merchant.eyebrow")}</p>
               <h1 className="mt-3 text-balance text-4xl font-black tracking-tight text-text sm:text-5xl">
-                Point of Sale
+                {t("merchant.title")}
               </h1>
               <p className="mt-4 text-base leading-relaxed text-text-secondary">
-                Manage your catalog and cart, generate QR codes for instant payments.
+                {t("merchant.desc")}
               </p>
             </div>
             {history.length > 0 && (
@@ -329,7 +329,7 @@ console.error("Failed to load cart:", err);
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted transition-colors hover:bg-ink-2 hover:text-text"
               >
-                View all transactions <ExternalLink className="h-3 w-3" />
+                {t("merchant.viewAllTx")} <ExternalLink className="h-3 w-3" />
               </a>
             )}
           </div>
@@ -347,14 +347,14 @@ console.error("Failed to load cart:", err);
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Package className="h-5 w-5 text-primary" />
-                  <h2 className="font-display text-lg font-semibold">Catalog</h2>
+                  <h2 className="font-display text-lg font-semibold">{t("merchant.catalog")}</h2>
                 </div>
                 <button
                   onClick={() => setIsAdding(!isAdding)}
                   className="inline-flex items-center gap-1 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/20"
                 >
                   <Plus className="h-3 w-3" />
-                  {isAdding ? "Cancel" : "Add Item"}
+                  {isAdding ? t("merchant.cancel") : t("merchant.addItem")}
                 </button>
               </div>
 
@@ -366,7 +366,7 @@ console.error("Failed to load cart:", err);
                       type="text"
                       value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
-                      placeholder="Item name"
+                      placeholder={t("merchant.itemName")}
                       className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
                     />
 <div className="relative">
@@ -385,7 +385,7 @@ console.error("Failed to load cart:", err);
                       type="submit"
                       className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
                     >
-                      Add
+                      {t("merchant.add")}
                     </button>
                   </div>
                 </form>
@@ -400,7 +400,7 @@ console.error("Failed to load cart:", err);
                 ) : catalog.length === 0 ? (
                   <div className="rounded-2xl border border-ink-line/30 bg-ink-2/20 p-8 text-center">
                     <Package className="mx-auto h-10 w-10 text-text-muted/40" />
-                    <p className="mt-3 text-sm text-text-muted">No items in catalog yet. Add your first item above.</p>
+                    <p className="mt-3 text-sm text-text-muted">{t("merchant.emptyCatalog")}</p>
                   </div>
                 ) : (
                   catalog.map((item) => (
@@ -419,7 +419,7 @@ console.error("Failed to load cart:", err);
                         <button
                           onClick={() => handleAddToCart(item)}
                           className="rounded-xl bg-primary/10 p-2 text-primary transition-all hover:bg-primary/20"
-                          title="Add to cart"
+                          title={t("merchant.addToCart")}
                         >
                           <ShoppingCart className="h-4 w-4" />
                         </button>
@@ -429,7 +429,7 @@ console.error("Failed to load cart:", err);
                             await loadCatalog();
                           }}
                           className="rounded-xl p-2 text-text-muted transition-all hover:bg-ink-line/40 hover:text-text"
-                          title="Delete item"
+                          title={t("merchant.deleteItem")}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -445,14 +445,14 @@ console.error("Failed to load cart:", err);
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="h-5 w-5 text-primary" />
-                  <h2 className="font-display text-lg font-semibold">Cart</h2>
+                  <h2 className="font-display text-lg font-semibold">{t("merchant.cart")}</h2>
                 </div>
                 <button
                   onClick={toggleCurrency}
 className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40 px-3 py-1.5 text-xs font-medium text-text-muted transition-all hover:bg-ink-2 hover:text-text"
                 >
                   <RefreshCcw className="h-3 w-3" />
-                  Show {currencyMode === "IDR" ? "USDC" : "IDR"}
+                  {t("merchant.show")} {currencyMode === "IDR" ? "USDC" : "IDR"}
                 </button>
               </div>
 
@@ -464,18 +464,18 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                 ) : cart.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <ShoppingCart className="h-10 w-10 text-text-muted/40" />
-                    <p className="mt-3 text-sm text-text-muted">Cart is empty.</p>
-                    <p className="mt-1 text-xs text-text-muted/70">Click items from the catalog to add them.</p>
+                    <p className="mt-3 text-sm text-text-muted">{t("merchant.emptyCart")}</p>
+                    <p className="mt-1 text-xs text-text-muted/70">{t("merchant.emptyCartHint")}</p>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center justify-between border-b border-ink-line/20 p-4">
-                      <span className="text-sm font-semibold">Cart Items</span>
+                      <span className="text-sm font-semibold">{t("merchant.cartItems")}</span>
                       <button
                         onClick={handleClearCart}
                         className="text-xs font-medium text-warn-amber hover:underline"
                       >
-                        Clear all
+                        {t("merchant.clearCart")}
                       </button>
                     </div>
                     <div className="divide-y divide-ink-line/20">
@@ -519,11 +519,11 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                     {/* Totals */}
                     <div className="border-t border-ink-line/30 p-4">
                       <div className="flex justify-between text-sm mb-2">
-<span className="text-text-muted">Subtotal</span>
+<span className="text-text-muted">{t("merchant.subtotal")}</span>
                         <span>{formatIDR(cartTotalIDR)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-semibold">Total</span>
+                        <span className="font-semibold">{t("merchant.total")}</span>
                         <span className="font-bold text-primary">{formattedTotal}</span>
                       </div>
                       {currencyMode === "IDR" && (
@@ -533,7 +533,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                       )}
                       <div className="mt-2 text-right text-[11px] text-text-muted/60">
                         1 USDC ≈ {formatIDR(Math.round(rate.idrPerUsdc))}
-                        {rate.source === "coingecko" ? " (live rate)" : " (estimasi)"}
+                        {rate.source === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
                       </div>
                     </div>
 
@@ -544,7 +544,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-strong hover:shadow-lg hover:shadow-primary/20"
                       >
                         <QrCode className="h-4 w-4" />
-                        Generate QR Code
+                        {t("merchant.generateQR")}
                       </button>
                     </div>
                   </>
@@ -561,7 +561,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2 text-primary">
                   <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-semibold">Payment QR Code</span>
+                  <span className="font-semibold">{t("merchant.paymentQR")}</span>
                 </div>
                 <button
                   onClick={() => setQrData(null)}
@@ -589,17 +589,17 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                 className="w-full flex items-center justify-center gap-2 rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted hover:bg-ink-2 hover:text-text mb-3"
               >
                 <Copy className="h-4 w-4" />
-                Copy QR data
+                {t("merchant.copyQR")}
               </button>
 
               {/* Testing: simulate payment */}
               <div className="border-t border-ink-line/30 pt-4">
-                <p className="text-xs text-text-muted text-center mb-2">For testing:</p>
+                <p className="text-xs text-text-muted text-center mb-2">{t("merchant.forTesting")}</p>
                 <button
                   onClick={handleSimulatePayment}
                   className="w-full rounded-xl bg-stamp-green/10 px-4 py-2 text-sm font-medium text-stamp-green hover:bg-stamp-green/20 transition-all"
                 >
-                  Simulate Payment Received
+                  {t("merchant.simulatePayment")}
                 </button>
               </div>
             </div>
@@ -611,9 +611,9 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-2xl border border-stamp-green/40 bg-ink p-8 text-center shadow-2xl">
 <CheckCircle2 className="mx-auto h-12 w-12 text-stamp-green mb-4" />
-              <h3 className="font-display text-xl font-semibold">Payment Received!</h3>
+              <h3 className="font-display text-xl font-semibold">{t("merchant.paymentReceived")}</h3>
               <p className="mt-2 text-text-muted">
-                {formatUSDC(successTx.amount)} received successfully.
+                {formatUSDC(successTx.amount)} {t("merchant.receivedSuccessfully")}
               </p>
               <a
                 href={`${ARC_EXPLORER_URL}/tx/${successTx.tx_hash}`}
@@ -621,13 +621,13 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                 rel="noreferrer"
                 className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline"
               >
-                View on explorer <ExternalLink className="h-3 w-3" />
+                {t("merchant.viewOnExplorer")} <ExternalLink className="h-3 w-3" />
               </a>
               <button
                 onClick={() => setSuccessTx(null)}
                 className="mt-6 w-full rounded-xl border border-ink-line/40 px-4 py-3 text-sm font-medium text-text-muted hover:bg-ink-2 hover:text-text transition-all"
               >
-                Done
+                {t("merchant.done")}
               </button>
             </div>
           </div>
@@ -638,7 +638,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
           <div className="mx-auto mt-12 w-full max-w-6xl">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="h-5 w-5 text-text-muted" />
-              <h2 className="font-display text-lg font-semibold">Recent Transactions</h2>
+              <h2 className="font-display text-lg font-semibold">{t("merchant.recentTx")}</h2>
             </div>
             <div className="space-y-2">
               {history.slice(0, 10).map((tx) => (
