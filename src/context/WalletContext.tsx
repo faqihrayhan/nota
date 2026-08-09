@@ -320,6 +320,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const disconnect = useCallback(() => {
+    // Revoke extension permissions if possible (Rabby, Rainbow, OKX support this)
+    const walletId = state.walletId;
+    if (walletId && walletId !== "metamask") {
+      const p = resolveProvider(walletId);
+      // Try to revoke permissions — wallet_revokePermissions is EIP-2255
+      // If the wallet doesn't support it, this silently fails
+      p?.request({
+        method: "wallet_revokePermissions",
+        params: [{ eth_accounts: {} }],
+      }).catch(() => {
+        // Some wallets don't support revoke — that's fine
+      });
+    }
+
     window.localStorage.removeItem(STORAGE_KEY);
     prevMmConnected.current = false;
     setState({
@@ -329,7 +343,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       status: "idle",
       error: null,
     });
-  }, []);
+  }, [state.walletId]);
 
   // Quietly reconnect non-MetaMask wallets on page load
   useEffect(() => {
