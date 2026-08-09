@@ -14,23 +14,23 @@ import {
   Loader2,
 } from "lucide-react";
 
-const WALLETS: { id: WalletId; label: string; monogram: string }[] = [
-  { id: "metamask", label: "MetaMask", monogram: "MM" },
-  { id: "okx", label: "OKX Wallet", monogram: "OKX" },
+const WALLETS: { id: WalletId; label: string; monogram: string; color: string }[] = [
+  { id: "metamask", label: "MetaMask", monogram: "MM", color: "#f6851b" },
+  { id: "rabby", label: "Rabby Wallet", monogram: "RB", color: "#8c6cf0" },
+  { id: "rainbow", label: "Rainbow", monogram: "RW", color: "#7c3aed" },
+  { id: "okx", label: "OKX Wallet", monogram: "OKX", color: "#0166ff" },
 ];
+
+const WALLET_LABELS: Record<WalletId, string> = {
+  metamask: "MetaMask",
+  rabby: "Rabby Wallet",
+  rainbow: "Rainbow",
+  okx: "OKX Wallet",
+};
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
-
-/* ============================================================
-   WALLET BUTTON — Nota v2.0
-   Features:
-   - Enhanced dropdown with icons
-   - Status indicators
-   - Smooth animations
-   - Compact mode for mobile
-   ============================================================ */
 
 export function WalletButton({ compact = false }: { compact?: boolean }) {
   const wallet = useWallet();
@@ -135,7 +135,7 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
                 {t("wallet.connectedVia")}
               </p>
               <p className="mt-0.5 text-sm font-medium capitalize">
-                {wallet.walletId === "okx" ? "OKX Wallet" : "MetaMask"}
+                {WALLET_LABELS[wallet.walletId ?? "metamask"]}
               </p>
             </div>
             <a
@@ -212,7 +212,10 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
                   rel="noreferrer"
                   className="flex items-center gap-3 bg-ink-2 px-4 py-3 text-sm text-text transition-colors hover:bg-ink-3"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px]">
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px]"
+                    style={{ color: w.color }}
+                  >
                     {w.monogram}
                   </span>
                   <span className="font-medium">{t("wallet.openInApp")} {w.label}</span>
@@ -241,7 +244,10 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
                 onClick={() => handlePick(w.id)}
                 className="flex w-full items-center gap-3 bg-ink-2 px-4 py-3 text-left text-sm text-text transition-colors hover:bg-ink-3"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px]">
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px]"
+                  style={{ color: w.color }}
+                >
                   {w.monogram}
                 </span>
                 {w.label}
