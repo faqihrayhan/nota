@@ -496,7 +496,7 @@ console.error("Failed to load cart:", err);
                           {currencyMode === "IDR" && ` ≈ ${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))}`}
                         </p>
                       </div>
-                      <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex gap-2 md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
                         <button
                           onClick={() => startEditItem(item)}
                           className="rounded-xl p-2 text-text-muted transition-all hover:bg-ink-line/40 hover:text-text"
