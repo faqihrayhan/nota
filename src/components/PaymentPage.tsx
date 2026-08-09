@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useWallet } from "@/context/WalletContext";
-import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { USDC_ADDRESS } from "@/lib/usdc-abi";
 import {
