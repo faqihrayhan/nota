@@ -1,13 +1,17 @@
-import type { Metadata } from "next";
+"use client";
+
+import { Nav } from "@/components/Nav";
 import MerchantPage from "@/components/MerchantPage";
+import { Footer } from "@/components/Footer";
 
-
-export const metadata: Metadata = {
-  title: "Merchant POS — Nota",
-  description:
-    "Kasir digital Nota: kelola katalog produk, susun pesanan, dan terima pembayaran USDC instan dengan konversi IDR real-time di Arc.",
-};
-
-export default function Merchant() {
-  return <MerchantPage />;
+export default function MerchantRoute() {
+  return (
+    <>
+      <Nav />
+      <main className="flex-1">
+        <MerchantPage />
+      </main>
+      <Footer />
+    </>
+  );
 }

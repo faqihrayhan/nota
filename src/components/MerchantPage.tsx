@@ -19,9 +19,16 @@ import {
   type Transaction,
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
+import {
+  fetchExchangeRate,
+  getCachedRate,
+  idrToUsdc,
+  formatIDR,
+  formatUSDC,
+  type ExchangeRate,
+} from "@/lib/exchange-rate";
 import { cn } from "@/lib/utils";
 import {
-  Store,
   Plus,
   Trash2,
   ShoppingCart,
@@ -34,17 +41,10 @@ import {
   AlertTriangle,
   Wallet,
   Package,
-  Receipt,
   RefreshCcw,
   QrCode,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-
-const IDR_TO_USDC_RATE = 16200;
-
-// Format helpers
-const formatIDR = (num: number) => `Rp ${num.toLocaleString("id-ID")}`;
-const formatUSDC = (num: number) => `${num.toFixed(2)} USDC`;
 
 function generateNonce() {
   return Math.random().toString(36).substring(2, 15);
@@ -97,6 +97,9 @@ export default function MerchantPage() {
   // History state
   const [history, setHistory] = useState<Transaction[]>([]);
 
+  // Live IDR⇄USDC rate (fetched from CoinGecko; falls back offline)
+  const [rate, setRate] = useState<ExchangeRate>(() => getCachedRate());
+
   // Load data on wallet connect
   useEffect(() => {
     if (!address) return;
@@ -104,6 +107,17 @@ export default function MerchantPage() {
     loadCart();
     loadHistory();
   }, [address]);
+
+  // Refresh the exchange rate on mount
+  useEffect(() => {
+    let active = true;
+    fetchExchangeRate().then((r) => {
+      if (active) setRate(r);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function loadCatalog() {
     if (!address) return;
@@ -151,7 +165,7 @@ console.error("Failed to load cart:", err);
 
   // Cart calculations
   const cartTotalIDR = cart.reduce((sum, item) => sum + item.price_idr * item.qty, 0);
-  const cartTotalUSDC = cartTotalIDR / IDR_TO_USDC_RATE;
+  const cartTotalUSDC = idrToUsdc(cartTotalIDR, rate.idrPerUsdc);
   const formattedTotal =
     currencyMode === "IDR" ? formatIDR(cartTotalIDR) : formatUSDC(cartTotalUSDC);
 
@@ -165,7 +179,7 @@ console.error("Failed to load cart:", err);
     if (!address || !newItemName.trim() || !newItemPrice.trim()) return;
     const priceNum = parseFloat(newItemPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
-    const priceIdr = currencyMode === "USDC" ? priceNum * IDR_TO_USDC_RATE : priceNum;
+    const priceIdr = currencyMode === "USDC" ? priceNum * rate.idrPerUsdc : priceNum;
     try {
       await addCatalogItem(address, newItemName.trim(), priceIdr);
       setNewItemName("");
@@ -226,7 +240,7 @@ console.error("Failed to load cart:", err);
     const totalUsdc = cartTotalUSDC.toFixed(6);
     const itemsForQR = cart.map((item) => ({
       name: item.item_name,
-      price: item.price_idr / IDR_TO_USDC_RATE,
+      price: idrToUsdc(item.price_idr, rate.idrPerUsdc),
     }));
 
     const qrPayload = {
@@ -255,7 +269,7 @@ console.error("Failed to load cart:", err);
         payee_address: address.toLowerCase(),
         amount: qrTotal,
         category: "belanja",
-        items: cart.map((c) => ({ name: c.item_name, price: c.price_idr / IDR_TO_USDC_RATE })),
+        items: cart.map((c) => ({ name: c.item_name, price: idrToUsdc(c.price_idr, rate.idrPerUsdc) })),
         tx_hash: `0xsimulated${Date.now()}`,
         block_hash: `0xsimulated${Date.now()}`,
         block_number: 0,
@@ -398,7 +412,7 @@ console.error("Failed to load cart:", err);
                         <p className="font-medium text-text">{item.name}</p>
                         <p className="text-sm text-text-muted">
                           {formatIDR(item.price_idr)}
-                          {currencyMode === "USDC" && ` ≈ ${formatUSDC(item.price_idr / IDR_TO_USDC_RATE)}`}
+                          {currencyMode === "USDC" && ` ≈ ${formatUSDC(idrToUsdc(item.price_idr, rate.idrPerUsdc))}`}
                         </p>
                       </div>
                       <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -472,7 +486,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                             <p className="text-sm text-text-muted">
                               {currencyMode === "IDR"
                                 ? `${formatIDR(item.price_idr)} × ${item.qty}`
-                                : `${formatUSDC(item.price_idr / IDR_TO_USDC_RATE)} × ${item.qty}`}
+                                : `${formatUSDC(idrToUsdc(item.price_idr, rate.idrPerUsdc))} × ${item.qty}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
@@ -517,6 +531,10 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                           ≈ {formatUSDC(cartTotalUSDC)}
                         </div>
                       )}
+                      <div className="mt-2 text-right text-[11px] text-text-muted/60">
+                        1 USDC ≈ {formatIDR(Math.round(rate.idrPerUsdc))}
+                        {rate.source === "coingecko" ? " (live rate)" : " (estimasi)"}
+                      </div>
                     </div>
 
                     {/* Generate QR button */}
