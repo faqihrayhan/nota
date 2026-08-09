@@ -14,7 +14,12 @@ import {
   Loader2,
 } from "lucide-react";
 
-const WALLETS: { id: WalletId; label: string; monogram: string; color: string }[] = [
+const WALLETS: {
+  id: WalletId;
+  label: string;
+  monogram: string;
+  color: string;
+}[] = [
   { id: "metamask", label: "MetaMask", monogram: "MM", color: "#f6851b" },
   { id: "rabby", label: "Rabby Wallet", monogram: "RB", color: "#8c6cf0" },
   { id: "rainbow", label: "Rainbow", monogram: "RW", color: "#7c3aed" },
@@ -89,7 +94,9 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
             ) : (
               <AlertTriangle className="h-4 w-4" />
             )}
-            <span className="hidden sm:inline">{t("wallet.switchNetwork")}</span>
+            <span className="hidden sm:inline">
+              {t("wallet.switchNetwork")}
+            </span>
             <span className="sm:hidden">Switch</span>
           </button>
           {switchError && (
@@ -193,7 +200,9 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
         <div
           className={cn(
             "z-50 mt-2 overflow-hidden rounded-2xl border border-ink-line/60 bg-ink-2 shadow-2xl shadow-black/60 ring-1 ring-black/40",
-            compact ? "absolute left-0 right-0 w-full" : "absolute right-0 w-64"
+            compact
+              ? "absolute left-0 right-0 w-full"
+              : "absolute right-0 w-64"
           )}
         >
           <div className="border-b border-ink-line/30 bg-ink-2 px-4 py-3">
@@ -203,26 +212,14 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
           </div>
           {WALLETS.map((w) => {
             const available = wallet.isProviderAvailable(w.id);
-            if (!available && wallet.isMobile) {
-              return (
-                <a
-                  key={w.id}
-                  href={wallet.mobileDeepLink(w.id)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-3 bg-ink-2 px-4 py-3 text-sm text-text transition-colors hover:bg-ink-3"
-                >
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-3 border border-ink-line/30 font-mono text-[10px]"
-                    style={{ color: w.color }}
-                  >
-                    {w.monogram}
-                  </span>
-                  <span className="font-medium">{t("wallet.openInApp")} {w.label}</span>
-                </a>
-              );
+
+            if (!available && wallet.isMobile && w.id === "metamask") {
+              // MetaMask is handled by SDK — always available
+              // (won't reach here since isProviderAvailable returns true for metamask)
             }
+
             if (!available) {
+              // Not detected — show as unavailable
               return (
                 <div
                   key={w.id}
@@ -234,10 +231,13 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
                     </span>
                     {w.label}
                   </span>
-                  <span className="text-[11px] text-text-faint">{t("wallet.notDetected")}</span>
+                  <span className="text-[11px] text-text-faint">
+                    {t("wallet.notDetected")}
+                  </span>
                 </div>
               );
             }
+
             return (
               <button
                 key={w.id}
