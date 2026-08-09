@@ -62,10 +62,14 @@ export function getCachedRate(): ExchangeRate {
   );
 }
 
-export const formatIDR = (num: number) => `Rp ${num.toLocaleString("id-ID")}`;
+export const formatIDR = (num: number) =>
+  `Rp ${num.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 
 export const formatUSDC = (num: number) =>
-  `${num.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
+  `${num.toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} USDC`;
 
 /** Convert IDR → USDC using the given rate. */
 export const idrToUsdc = (idr: number, rate: number) => idr / rate;

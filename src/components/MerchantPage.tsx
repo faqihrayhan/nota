@@ -6,6 +6,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import {
   getCatalog,
   addCatalogItem,
+  updateCatalogItem,
   deleteCatalogItem,
   getCart,
   addToCart,
@@ -42,6 +43,7 @@ import {
   AlertTriangle,
   Wallet,
   Package,
+  Pencil,
   RefreshCcw,
   QrCode,
 } from "lucide-react";
@@ -73,6 +75,9 @@ export default function MerchantPage() {
   const [newItemPrice, setNewItemPrice] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPrice, setEditPrice] = useState("");
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -111,13 +116,20 @@ export default function MerchantPage() {
     };
   }, []);
 
-  // Manual refresh: pull the latest rate on demand
+  // Manual refresh: pull the latest rate on demand.
+  // Hanya memperbarui kurs tampilan (harga katalog tetap, isi keranjang
+  // otomatis ikut dihitung ulang dengan rate baru).
   async function handleRefreshRate() {
     if (refreshingRate) return;
     setRefreshingRate(true);
-    const fresh = await fetchExchangeRate();
-    setRate(fresh);
-    setRefreshingRate(false);
+    try {
+      const fresh = await fetchExchangeRate();
+      setRate(fresh);
+    } catch {
+      // fetchExchangeRate never throws (falls back to default), keep old rate
+    } finally {
+      setRefreshingRate(false);
+    }
   }
 
   async function loadCatalog() {
@@ -179,6 +191,38 @@ console.error("Failed to load cart:", err);
       setNewItemName("");
       setNewItemPrice("");
       setIsAdding(false);
+      await loadCatalog();
+    } catch (err) {
+      setError(t("merchant.failedToAddItem"));
+      console.error(err);
+    }
+  }
+
+  // Edit item in catalog
+  function startEditItem(item: CatalogItem) {
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditPrice(currencyMode === "IDR"
+      ? Math.round(usdcToIdr(item.price_usdc, rate.idrPerUsdc)).toString()
+      : item.price_usdc.toString());
+    setIsAdding(false);
+  }
+
+  function cancelEditItem() {
+    setEditingItem(null);
+    setEditName("");
+    setEditPrice("");
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!address || !editingItem || !editName.trim() || !editPrice.trim()) return;
+    const priceNum = parseFloat(editPrice.replace(/[^0-9.]/g, ""));
+    if (isNaN(priceNum) || priceNum <= 0) return;
+    const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
+    try {
+      await updateCatalogItem(editingItem.id, editName.trim(), priceUsdc);
+      cancelEditItem();
       await loadCatalog();
     } catch (err) {
       setError(t("merchant.failedToAddItem"));
@@ -397,7 +441,50 @@ console.error("Failed to load cart:", err);
                     <p className="mt-3 text-sm text-text-muted">{t("merchant.emptyCatalog")}</p>
                   </div>
                 ) : (
-                  catalog.map((item) => (
+                  catalog.map((item) =>
+                    editingItem?.id === item.id ? (
+                      /* Inline edit form */
+                      <form
+                        key={item.id}
+                        onSubmit={handleSaveEdit}
+                        className="rounded-2xl border border-accent/40 bg-ink-2/50 p-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder={t("merchant.itemName")}
+                            className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
+                          />
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
+                              {currencyMode === "IDR" ? "Rp" : "$"}
+                            </span>
+                            <input
+                              type="text"
+                              value={editPrice}
+                              onChange={(e) => setEditPrice(e.target.value)}
+                              placeholder={currencyMode === "IDR" ? "25.000" : "1.50"}
+                              className="w-full rounded-xl border border-ink-line/40 bg-ink pl-10 pr-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-32"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
+                          >
+                            {t("merchant.save")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditItem}
+                            className="rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted transition-all hover:bg-ink-2 hover:text-text"
+                          >
+                            {t("merchant.cancel")}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
                     <div
                       key={item.id}
                       className="group flex items-center justify-between rounded-2xl border border-ink-line/30 bg-ink-2/20 p-4 transition-all hover:border-ink-line/60 hover:bg-ink-2/40"
@@ -410,6 +497,13 @@ console.error("Failed to load cart:", err);
                         </p>
                       </div>
                       <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                        <button
+                          onClick={() => startEditItem(item)}
+                          className="rounded-xl p-2 text-text-muted transition-all hover:bg-ink-line/40 hover:text-text"
+                          title={t("merchant.editItem")}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleAddToCart(item)}
                           className="rounded-xl bg-primary/10 p-2 text-primary transition-all hover:bg-primary/20"
@@ -429,7 +523,8 @@ console.error("Failed to load cart:", err);
                         </button>
                       </div>
                     </div>
-                  ))
+                    )
+                  )
                 )}
               </div>
             </div>
