@@ -102,6 +102,7 @@ export default function MerchantPage() {
 
   // Live IDR⇄USDC rate (fetched from CoinGecko; falls back offline)
   const [rate, setRate] = useState<ExchangeRate>(() => getCachedRate());
+  const [refreshingRate, setRefreshingRate] = useState(false);
 
   // Load data on wallet connect
   useEffect(() => {
@@ -121,6 +122,15 @@ export default function MerchantPage() {
       active = false;
     };
   }, []);
+
+  // Manual refresh: pull the latest rate on demand
+  async function handleRefreshRate() {
+    if (refreshingRate) return;
+    setRefreshingRate(true);
+    const fresh = await fetchExchangeRate();
+    setRate(fresh);
+    setRefreshingRate(false);
+  }
 
   async function loadCatalog() {
     if (!address) return;
@@ -534,9 +544,19 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                           ≈ {formatUSDC(cartTotalUSDC)}
                         </div>
                       )}
-                      <div className="mt-2 text-right text-[11px] text-text-muted/60">
-                        1 USDC ≈ {formatIDR(Math.round(rate.idrPerUsdc))}
-                        {rate.source === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
+                      <div className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-text-muted/60">
+                        <span>
+                          1 USDC ≈ {formatIDR(Math.round(rate.idrPerUsdc))}
+                          {rate.source === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
+                        </span>
+                        <button
+                          onClick={handleRefreshRate}
+                          disabled={refreshingRate}
+                          title="Refresh rate"
+                          className="rounded-md p-1 text-text-muted/60 transition-colors hover:bg-ink-line/40 hover:text-text disabled:opacity-50"
+                        >
+                          <RefreshCcw className={cn("h-3 w-3", refreshingRate && "animate-spin")} />
+                        </button>
                       </div>
                     </div>
 
