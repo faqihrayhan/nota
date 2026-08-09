@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -114,52 +114,25 @@ export default function PaymentPage() {
 }
 
 function PaymentPageInner() {
-  const { address, isCorrectNetwork } = useWallet();
+  const wallet = useWallet();
+  const { address, isCorrectNetwork } = wallet;
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("bayar");
 
+  const [tab, setTab] = useState<Tab>("bayar");
   const [items, setItems] = useState<{ name: string; price: string }[]>([
     { name: "", price: "" },
   ]);
   const [category, setCategory] = useState("makan");
+  const [qrData, setQrData] = useState<QRData | null>(null);
   const [qrSvg, setQrSvg] = useState<string>("");
   const [qrRaw, setQrRaw] = useState<string>("");
+  const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
   const [merchantPrefill, setMerchantPrefill] = useState<{ items: string; amount: string } | null>(null);
 
-  // Read query params from /merchant (?source=merchant&items=...&amount=...)
-  const searchParams = useSearchParams();
-  useEffect(() => {
-    if (searchParams.get("source") !== "merchant") return;
-    const itemsParam = searchParams.get("items") ?? "";
-    const amountParam = searchParams.get("amount") ?? "";
-    if (!itemsParam && !amountParam) return;
-    setMerchantPrefill({ items: itemsParam, amount: amountParam });
-    // Switch to create tab so cashier can review & generate QR directly.
-    setTab("create");
-    // Prefill items list by parsing "2x Item A, 1x Item B"
-    if (itemsParam) {
-      const parsed: PaymentItem[] = itemsParam
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => {
-          const m = s.match(/^(\d+)x\s+(.+)$/);
-          const qty = m ? Math.max(1, parseInt(m[1], 10)) : 1;
-          const name = (m ? m[2] : s).trim();
-          // Split amount evenly across item rows; qty multiplier applied client-side by cashier.
-          const perItem = amountParam && !isNaN(parseFloat(amountParam))
-            ? (parseFloat(amountParam) / Math.max(1, itemsParam.split(",").length)).toFixed(2)
-            : "0";
-          return { name, price: perItem };
-        });
-      setItems(parsed);
-      setPrefillBanner(`Items from /merchant: ${itemsParam} (${amountParam} USDC)`);
-    } else {
-      setPrefillBanner(`Total from /merchant: ${amountParam} USDC`);
-    }
-  }, [searchParams]);
+  type PrefillItem = { id: string; name: string; qty: number; price: number };
+  const [posPrefill, setPosPrefill] = useState<{ items: PrefillItem[]; totalUSDC: number } | null>(null);
+
   const [paidTx, setPaidTx] = useState<Transaction | null>(null);
   const [approving, setApproving] = useState(false);
   const [approveTx, setApproveTx] = useState("");
@@ -179,6 +152,48 @@ function PaymentPageInner() {
     const price = parseFloat(item.price) || 0;
     return sum + price;
   }, 0);
+
+  useEffect(() => {
+    if (searchParams.get("source") !== "merchant") return;
+    const itemsParam = searchParams.get("items") ?? "";
+    const amountParam = searchParams.get("amount") ?? "";
+    if (!itemsParam && !amountParam) return;
+
+    setMerchantPrefill({ items: itemsParam, amount: amountParam });
+
+    if (itemsParam) {
+      const parsed: PrefillItem[] = itemsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s, idx) => {
+          const m = s.match(/^(\d+)x\s+(.+)$/);
+          const qty = m ? Math.max(1, parseInt(m[1], 10)) : 1;
+          const name = (m ? m[2] : s).trim();
+          const totalAmount = amountParam && !isNaN(parseFloat(amountParam))
+            ? parseFloat(amountParam)
+            : 0;
+          const perItem = totalAmount / Math.max(1, itemsParam.split(",").length);
+          return { id: `pos-${idx}`, name, qty, price: perItem };
+        });
+      const totalUSDC = amountParam && !isNaN(parseFloat(amountParam))
+        ? parseFloat(amountParam)
+        : parsed.reduce((sum, it) => sum + it.price * it.qty, 0);
+      setPosPrefill({ items: parsed, totalUSDC });
+      setPrefillBanner(`Items from /merchant: ${itemsParam} (${amountParam} USDC)`);
+    } else if (amountParam) {
+      setPrefillBanner(`Total from /merchant: ${amountParam} USDC`);
+    }
+  }, [searchParams]);
+
+  const merchantItems = posPrefill?.items ?? [];
+  const totalMerchantUSDC = posPrefill?.totalUSDC ?? 0;
+
+  const clearPosPrefill = () => {
+    setPosPrefill(null);
+    setMerchantPrefill(null);
+    setPrefillBanner(null);
+  };
 
   useEffect(() => {
     if (!qrData) {
@@ -415,7 +430,74 @@ const confirmTransfer = async () => {
   );
 
   const closeCamera = useCallback(() => setCameraOpen(false), []);
+async function handleTransferFrom() {
+    if (!wallet.address || !scannedData) return;
 
+    const provider = resolveProvider(wallet.walletId!);
+    if (!provider) {
+      setError(t("payment.error.walletNotFound"));
+      return;
+    }
+
+    setTransferring(true);
+    setError("");
+
+    try {
+      const amountInUsdc = parseFloat(scannedData.totalAmount) / 1_000_000;
+      const payeeAddress = scannedData.payerAddress.toLowerCase();
+      const amountInUnits = BigInt(Math.floor(amountInUsdc * 1_000_000)).toString();
+
+      const calldata = encodeTransferFrom(wallet.address, payeeAddress, amountInUnits);
+
+      const txHash = (await provider.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: wallet.address,
+            to: USDC_ADDRESS,
+            data: calldata,
+          },
+        ],
+      })) as string;
+
+      await new Promise((r) => setTimeout(r, 4000));
+
+      const receipt = (await provider.request({
+        method: "eth_getTransactionReceipt",
+        params: [txHash],
+      })) as { blockHash: string; blockNumber: string; status: string } | null;
+
+      const isSuccess = receipt?.status === "0x1";
+      if (!isSuccess) {
+        throw new Error(t("payment.error.transferFailed"));
+      }
+
+      const tx: Transaction = {
+        id: generateNonce(),
+        payer_address: wallet.address.toLowerCase(),
+        payee_address: payeeAddress,
+        amount: amountInUsdc,
+        category: scannedData.category,
+        items: scannedData.items,
+        tx_hash: txHash,
+        block_hash: receipt?.blockHash ?? "",
+        block_number: receipt ? parseInt(receipt.blockNumber, 16) : 0,
+        status: "confirmed",
+        mode: "payment",
+        created_at: new Date().toISOString(),
+        nonce: scannedData.nonce,
+      };
+
+      await saveTransaction(tx);
+      setSuccessTx(tx);
+      setScannedData(null);
+      setScanInput("");
+    } catch (err) {
+      setError((err as Error).message || t("payment.error.transferFailed"));
+    } finally {
+      setTransferring(false);
+    }
+  }
   if (!wallet.address) {
     return (
       <section className="relative mx-auto max-w-2xl px-5 py-24">
