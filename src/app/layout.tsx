@@ -11,9 +11,9 @@ import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nota — Catatan Pembayaran di Arc",
+  title: "Nota",
   description:
-    "Bayar, analisa, dan proyeksikan pengeluaranmu on-chain di Arc Testnet.",
+    "Payment, and Analysis your Cashflow with on-chain Arc Testnet.",
 };
 
 export const viewport: Viewport = {
