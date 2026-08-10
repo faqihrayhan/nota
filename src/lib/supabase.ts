@@ -1,4 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * Supabase client factory (Phase 5 — Payment Hardening).
+ *
+ * Instead of one global anon client, we now create clients on demand so we
+ * can attach the wallet JWT as the Bearer token. RLS policies on
+ * `transactions` / `merchant_catalog` / `merchant_cart` read the JWT claim
+ * (`wallet_address`) to scope rows per wallet.
+ */
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,9 +18,42 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+/** Create a Supabase client. Pass a JWT to authenticate as a wallet. */
+export function createSupabaseClient(token?: string | null): SupabaseClient {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  // supabaseUrl/supabaseKey are guaranteed set by the module-level check above.
+  return createClient(supabaseUrl!, supabaseKey!, { global: { headers } });
+}
 
-// Types
+// ─── Wallet auth token (Phase 5) ─────────────────────────────
+
+const AUTH_TOKEN_KEY = "arc-nota:auth-token";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+/** Client bound to the current wallet JWT (or anon if no token). */
+export function getAuthedClient(): SupabaseClient {
+  return createSupabaseClient(getAuthToken());
+}
+
+// ─── Types ───────────────────────────────────────────────────
+
 export type Transaction = {
   id: string;
   wallet_address: string;
@@ -48,10 +90,10 @@ export type CartItem = {
   added_at: string;
 };
 
-// ─── Catalog ────────────────────────────────────────────────
+// ─── Catalog ─────────────────────────────────────────────────
 
 export async function getCatalog(walletAddress: string): Promise<CatalogItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getAuthedClient()
     .from("merchant_catalog")
     .select("*")
     .eq("wallet_address", walletAddress.toLowerCase())
@@ -65,7 +107,7 @@ export async function addCatalogItem(
   name: string,
   priceUsdc: number
 ): Promise<CatalogItem> {
-  const { data, error } = await supabase
+  const { data, error } = await getAuthedClient()
     .from("merchant_catalog")
     .insert({
       wallet_address: walletAddress.toLowerCase(),
@@ -83,7 +125,7 @@ export async function updateCatalogItem(
   name: string,
   priceUsdc: number
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getAuthedClient()
     .from("merchant_catalog")
     .update({ name, price_usdc: priceUsdc, updated_at: new Date().toISOString() })
     .eq("id", id);
@@ -91,14 +133,14 @@ export async function updateCatalogItem(
 }
 
 export async function deleteCatalogItem(id: string): Promise<void> {
-  const { error } = await supabase.from("merchant_catalog").delete().eq("id", id);
+  const { error } = await getAuthedClient().from("merchant_catalog").delete().eq("id", id);
   if (error) throw error;
 }
 
-// ─── Cart ───────────────────────────────────────────────────
+// ─── Cart ────────────────────────────────────────────────────
 
 export async function getCart(walletAddress: string): Promise<CartItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getAuthedClient()
     .from("merchant_cart")
     .select("*")
     .eq("wallet_address", walletAddress.toLowerCase())
@@ -114,7 +156,7 @@ export async function addToCart(
   priceUsdc: number
 ): Promise<CartItem> {
   // Check if item already exists in cart
-  const existing = await supabase
+  const existing = await getAuthedClient()
     .from("merchant_cart")
     .select("*")
     .eq("wallet_address", walletAddress.toLowerCase())
@@ -123,7 +165,7 @@ export async function addToCart(
 
   if (existing.data) {
     // Update qty
-    const { error } = await supabase
+    const { error } = await getAuthedClient()
       .from("merchant_cart")
       .update({ qty: existing.data.qty + qty })
       .eq("id", existing.data.id);
@@ -132,7 +174,7 @@ export async function addToCart(
   }
 
   // Insert new
-  const { data, error } = await supabase
+  const { data, error } = await getAuthedClient()
     .from("merchant_cart")
     .insert({
       wallet_address: walletAddress.toLowerCase(),
@@ -151,7 +193,7 @@ export async function updateCartItemQty(id: string, qty: number): Promise<void> 
     await removeFromCart(id);
     return;
   }
-  const { error } = await supabase
+  const { error } = await getAuthedClient()
     .from("merchant_cart")
     .update({ qty })
     .eq("id", id);
@@ -159,25 +201,25 @@ export async function updateCartItemQty(id: string, qty: number): Promise<void> 
 }
 
 export async function removeFromCart(id: string): Promise<void> {
-  const { error } = await supabase.from("merchant_cart").delete().eq("id", id);
+  const { error } = await getAuthedClient().from("merchant_cart").delete().eq("id", id);
   if (error) throw error;
 }
 
 export async function clearCart(walletAddress: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getAuthedClient()
     .from("merchant_cart")
     .delete()
     .eq("wallet_address", walletAddress.toLowerCase());
   if (error) throw error;
 }
 
-// ─── Transactions ───────────────────────────────────────────
+// ─── Transactions ────────────────────────────────────────────
 
 export async function getTransactions(
   walletAddress: string,
   limit = 50
 ): Promise<Transaction[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getAuthedClient()
     .from("transactions")
     .select("*")
     .eq("wallet_address", walletAddress.toLowerCase())
@@ -188,7 +230,7 @@ export async function getTransactions(
 }
 
 export async function saveTransaction(tx: Omit<Transaction, "id" | "created_at">): Promise<Transaction> {
-  const { data, error } = await supabase
+  const { data, error } = await getAuthedClient()
     .from("transactions")
     .insert({
       ...tx,
@@ -203,7 +245,7 @@ export async function saveTransaction(tx: Omit<Transaction, "id" | "created_at">
 export async function findTransactionByNonce(
   nonce: string
 ): Promise<Transaction | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getAuthedClient()
     .from("transactions")
     .select("*")
     .eq("nonce", nonce)
@@ -213,7 +255,7 @@ export async function findTransactionByNonce(
 }
 
 export function subscribeToTransactions(onInsert: () => void): () => void {
-  const channel = supabase
+  const channel = getAuthedClient()
     .channel("transactions-changes")
     .on(
       "postgres_changes",
@@ -222,6 +264,6 @@ export function subscribeToTransactions(onInsert: () => void): () => void {
     )
     .subscribe();
   return () => {
-    supabase.removeChannel(channel);
+    getAuthedClient().removeChannel(channel);
   };
 }
