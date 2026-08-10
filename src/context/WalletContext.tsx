@@ -14,6 +14,7 @@ import {
   ARC_TESTNET_CHAIN_ID_HEX,
   ARC_TESTNET_PARAMS,
 } from "@/lib/arc-chain";
+import { signInWithWallet, signOutWallet } from "@/lib/auth/client";
 
 export type WalletId = "metamask" | "okx" | "rabby" | "rainbow";
 
@@ -49,6 +50,8 @@ type EipProvider = {
   on?: (event: string, cb: (...args: unknown[]) => void) => void;
   removeListener?: (event: string, cb: (...args: unknown[]) => void) => void;
 };
+
+export type { EipProvider };
 
 function findProvider(
   predicate: (p: EipProvider) => boolean
@@ -184,6 +187,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     mmSdkRef.current = sdk;
   }, []);
 
+  /**
+   * Wallet sign-in: request a nonce, ask the wallet to sign, exchange for JWT.
+   * Called automatically after a successful connect.
+   */
+  const signInWallet = useCallback(
+    async (addr: string, provider: EipProvider): Promise<void> => {
+      try {
+        await signInWithWallet(provider, addr);
+      } catch (err) {
+        // Non-fatal: app still works read-only/anon; log & continue.
+        console.warn("wallet sign-in skipped:", (err as Error)?.message ?? err);
+      }
+    },
+    []
+  );
+
   const switchToArc = useCallback(async () => {
     if (!state.walletId) throw new Error("no_wallet");
 
@@ -271,6 +290,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           });
           window.localStorage.setItem(STORAGE_KEY, id);
           prevMmConnected.current = true;
+          // Auto sign-in: exchange a signed message for a JWT (RLS auth).
+          if (accounts[0] && provider) {
+            void signInWallet(accounts[0], provider);
+          }
         }
       } catch (err) {
         const code = (err as { code?: number })?.code;
@@ -314,9 +337,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         error: null,
       });
       window.localStorage.setItem(STORAGE_KEY, id);
+      // Auto sign-in: exchange a signed message for a JWT (RLS auth).
+      if (accounts[0]) {
+        void signInWallet(accounts[0], p);
+      }
     } catch {
       setState((s) => ({ ...s, status: "error", error: "rejected" }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const disconnect = useCallback(() => {
@@ -336,6 +364,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     window.localStorage.removeItem(STORAGE_KEY);
     prevMmConnected.current = false;
+    signOutWallet();
     setState({
       address: null,
       chainIdHex: null,
