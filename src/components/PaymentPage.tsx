@@ -374,19 +374,19 @@ const unsub = subscribeToTransactions(() => loadHistory());
               {t("payment.openCamera")}
             </button>
             <span className="text-[11px] font-mono uppercase tracking-widest text-text-faint">{t("payment.or")}</span>
-            <div className="flex w-full max-w-md gap-2">
+            <div className="flex w-full max-w-md flex-col gap-2.5">
               <input
                 type="text"
                 value={scanInput}
                 onChange={(e) => setScanInput(e.target.value)}
                 placeholder={t("payment.scanPlaceholder")}
-                className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                className="w-full rounded-xl border border-ink-line/40 bg-ink px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <button
                 onClick={handleScan}
                 className={cn(
-                  "inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition-all",
-                  "hover:bg-accent-strong hover:shadow-lg hover:shadow-accent/20"
+                  "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition-all",
+                  "hover:bg-accent-strong hover:shadow-lg hover:shadow-accent/20 active:scale-[0.99]"
                 )}
               >
                 <ScanLine className="h-4 w-4" />
