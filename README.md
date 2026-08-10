@@ -1,107 +1,191 @@
-# Nota
+# Nota — On-Chain Payment & Financial OS
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Built%20on-Arc%20Testnet-4E7FE0?style=flat-square" alt="Built on Arc Testnet" />
-  <img src="https://img.shields.io/badge/Next.js-16.2.10-000000?style=flat-square&logo=next.js" alt="Next.js 16" />
-  <img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-v4-06B6D4?style=flat-square&logo=tailwindcss" alt="Tailwind CSS" />
-</p>
+> **Pay with a QR code. Get an on-chain receipt, spending analysis, and a forecast for next month.**
 
+Nota is a stablecoin-native payment app and financial operating system built on the
+[Arc Network](https://arc.io) testnet. Every payment becomes a *nota* (Indonesian for
+"receipt") — a digital record that lives on-chain, feeds your spending insights, and
+projects what your next month looks like.
 
-## About
-
-Nota
-
-**Payment tracking and financial insight, on-chain on Arc.**
-
-Pay with a QR code, get it logged as a digital receipt automatically,
-analyzed, and projected forward. Built on [Arc](https://arc.io) a stablecoin payments network.
-
-**Product Analogy:** Most crypto payment apps stop at "transaction sent." Nota goes one step
-further every payment becomes a note (a "nota," Indonesian for
-receipt), which then feeds into spending analysis and a forecast for
-next month. Think of it like a triplicate receipt book, except one copy
-lives on-chain.
+Think of it like a triplicate receipt book, except one copy lives on the blockchain:
+provably permanent, cryptographically verifiable, and unforgeable.
 
 ---
 
-## Features
+## ✨ Features
 
 | Feature | What it does | Status |
 |---|---|---|
-| **Payment** | Show a payment QR, get scanned, logged on-chain automatically | Success |
-| **Insights** | Auto-categorized breakdown of where your money went | Success |
-| **Forecast** | Projected spending for next month based on history | Success |
+| **Scan & Pay** | Show a payment QR or scan one; pay in USDC with your wallet; transaction is logged on-chain automatically | ✅ Live |
+| **Merchant POS** | Product catalog, cart, live USDC/IDR pricing via CoinGecko, and QR invoice generation | ✅ Live |
+| **Receipts** | Digital receipt per transaction — viewable on-screen or exported as PDF | ✅ Live |
+| **Insights** | Auto-categorized breakdown of where your money went | ✅ Live |
+| **Forecast** | Projected spending for next month, based on your transaction history | ✅ Live |
+| **Nota Score** | Wallet health score derived from on-chain payment behavior | ✅ Live |
+| **Split Bill** | Split a bill among friends on-chain | ✅ Live |
+| **i18n** | Full Indonesian / English language toggle | ✅ Live |
+| **Dark / Light** | Theme switcher (system-aware via `next-themes`) | ✅ Live |
 
-Landing page, wallet connection, dark/light mode, and ID/EN language
-support are already live.
-
----
-
-## Tech Stack
-
-- **Next.js 16** (App Router, Turbopack) + **TypeScript**
-- **Tailwind CSS v4**  
-- **next-themes**  dark/light mode
-- **Wallet**  EIP-1193 custom (MetaMask & OKX)
-- **i18n** custom dictionary (ID/EN)
-- **Database** Supabase (with localStorage fallback)
+Landing page, wallet connection, dark/light mode, and ID/EN language support are all
+live.
 
 ---
 
-## Arc Testnet
+## 🛠 Tech Stack
 
-| Parameter | Nilai |
-|-----------|-------|
+- **Next.js 16** (App Router, Turbopack) + **TypeScript** — server components where
+  possible, client components where interactivity lives
+- **Tailwind CSS v4** — utility-first styling
+- **Framer Motion** — scroll-reveal animations with reduced-motion fallbacks
+- **EIP-1193 wallet integration** — custom provider abstraction (MetaMask via
+  `@metamask/sdk`, OKX, Rabby, Rainbow)
+- **USDC payments** — direct ERC-20 `transferFrom` calldata against Arc's native USDC
+- **Supabase (Postgres)** — catalog, cart, and transaction storage with Row Level
+  Security enabled; `localStorage` fallback for wallet/language persistence
+- **QR** — `qrcode.react` (generate) + `html5-qrcode` (scan camera)
+- **Receipt export** — `jspdf` + `html-to-image` (PDF download)
+- **i18n** — custom ID/EN dictionary (`src/i18n/`)
+
+### Wallet support
+
+| Wallet | Status |
+|---|---|
+| MetaMask | ✅ (SDK) |
+| OKX | ✅ |
+| Rabby | ✅ |
+| Rainbow | ✅ |
+
+---
+
+## ⛓ Arc Testnet
+
+| Parameter | Value |
+|---|---|
 | RPC URL | `https://rpc.testnet.arc.network` |
-| Chain ID | `5042002` (hex: `0x4cef52`) |
+| Chain ID | `5042002` (hex `0x4cef52`) |
 | Explorer | [testnet.arcscan.app](https://testnet.arcscan.app) |
 | Faucet | [faucet.circle.com](https://faucet.circle.com) |
-| Gas Token | USDC (native: 18 decimal, ERC-20: 6 decimal) |
+| Gas token | USDC — native 18 decimals, ERC-20 6 decimals |
+| Network type | **Testnet** — tokens have **no real value** |
+
+> ⚠️ **Heads up:** Nota runs on Arc **Testnet**. All transactions here use test tokens
+> with no real-world value — purely for building and testing.
 
 ---
 
-## Running Locally
+## 🚀 Getting Started
 
 ```bash
-# Clone & install
+# 1. Clone
 git clone https://github.com/faqihrayhan/arc-nota.git
 cd arc-nota
+
+# 2. Install dependencies
 npm install
 
-# Jalankan dev server
+# 3. Set up environment variables
+cp .env.example .env.local   # if present, or create one
+# NEXT_PUBLIC_SUPABASE_URL=...
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+
+# 4. Run the dev server
 npm run dev
-# Buka http://localhost:3000
+# Open http://localhost:3000
 ```
+
+### Available scripts
+
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Start development server (Turbopack) |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run prepare` | Install Husky git hooks |
+
+### Quality gates
+
+Husky `pre-commit` runs **`tsc --noEmit` + ESLint** before every commit — no type
+errors, no lint errors, no commit.
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 src/
-├── app/          # Routing & layout (Next.js App Router)
-├── components/   # UI components
-├── context/      # React Context (wallet, language)
-├── lib/          # Config & helpers (chain config, etc.)
-└── i18n/         # ID/EN translation strings
+├── app/          # Routing & layouts (Next.js App Router)
+│   ├── page.tsx          # Landing page
+│   ├── payment/          # Scan & Pay
+│   ├── merchant/         # Merchant POS
+│   ├── analisa/          # Spending insights
+│   ├── forecast/         # Next-month forecast
+│   ├── score/            # Nota Score
+│   └── split-bill/       # Split bill
+├── components/   # UI components (MerchantPage, PaymentPage, QRScanner, ReceiptModal…)
+├── context/      # React Context (WalletContext, LanguageContext)
+├── lib/          # Config & helpers (arc-chain, usdc-abi, supabase, exchange-rate)
+└── i18n/         # ID/EN translation dictionaries
 ```
+
+### Key modules
+
+| Module | Role |
+|---|---|
+| `src/lib/arc-chain.ts` | Arc Testnet chain config (EIP-3085 params, explorer URL) |
+| `src/lib/usdc-abi.ts` | USDC ERC-20 ABI + contract address |
+| `src/lib/supabase.ts` | Typed Supabase data layer (catalog, cart, transactions) |
+| `src/lib/exchange-rate.ts` | Live CoinGecko USDC/IDR rate with fallback |
+| `src/context/WalletContext.tsx` | EIP-1193 provider abstraction & wallet state |
+| `src/components/QRScanner.tsx` | Camera-based QR scanning |
 
 ---
 
-## Heads up
+## 🔒 Security & Data Model
 
-This runs on **Arc Testnet** tokens and transactions here have **no
-real value**. Purely for building and testing.
+- **Row Level Security (RLS)** is enabled on `transactions`, `merchant_catalog`, and
+  `merchant_cart` tables in Supabase.
+- Prices are stored natively in **USDC** (`price_usdc`), with IDR conversion handled at
+  display time using the live CoinGecko rate (fallback `16200` IDR/USDC if the API is
+  unreachable).
+- Transaction IDs are server-generated UUIDs (`gen_random_uuid()` default).
 
-## Built on Arc
+> **Note:** Current RLS policies are permissive (`USING (true)`) for development.
+> Per-wallet hardening (Phase 5) is on the roadmap — see below.
 
-This project is built on [Arc](https://arc.io) infrastructure. See the
-[Arc Brand Guidelines](https://www.arc.io/brand-guidelines-and-partner-toolkit)
-for logo/name usage.
+---
 
-## License
+## 🗺 Roadmap
 
-MIT License. See [LICENSE](./LICENSE) for details.
+### v1 (current) — Stablecoin POS & Insights
+- [x] Scan & Pay with QR (USDC on Arc Testnet)
+- [x] Merchant catalog, cart, live IDR/USDC pricing
+- [x] Receipts, insights, forecast, Nota Score, split bill
+- [x] Wallet support: MetaMask SDK, OKX, Rabby, Rainbow
+- [x] ID/EN i18n + dark/light mode
+- [x] Supabase persistence with RLS enabled
 
-Built with [Next.js](https://nextjs.org), [TypeScript](https://www.typescriptlang.org), [Tailwind CSS](https://tailwindcss.com), and [Arc Testnet](https://www.arc.io).
+### v2 — Payment Hardening & On-Chain Invoices
+- [ ] **Phase 5 — Payment Hardening**: per-wallet RLS policies (private catalog/cart,
+      own-transactions-only), QR payload signing & validation (anti-tamper, anti-phishing)
+- [ ] **Phase 6 — Smart Contract Core**: deploy `NotaInvoiceManager.sol` on Arc Testnet —
+      on-chain invoice registry/escrow (`createInvoice` / `payInvoice`), Supabase as an
+      indexer of contract events
+- [ ] **Phase 7 — Nota Score v2**: incorporate on-chain verified payment history
+      (cryptographically valid, not just DB entries)
+
+---
+
+## 🧱 Built on Arc
+
+This project is built on [Arc](https://arc.io) infrastructure — a stablecoin-native
+network purpose-built for payments: predictable low gas, USDC settlement, and
+trustless verification. See the
+[Arc Brand Guidelines](https://www.arc.io/brand-guidelines-and-partner-toolkit) for
+partner assets.
+
+---
+
+## 📄 License
+
+Private project — all rights reserved.
