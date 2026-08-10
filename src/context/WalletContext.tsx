@@ -194,7 +194,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const signInWallet = useCallback(
     async (addr: string, provider: EipProvider): Promise<void> => {
       try {
-        const token = await signInWithWallet(provider, addr);
+        await signInWithWallet(provider, addr);
       } catch (err) {
         // Non-fatal: app still works read-only/anon; log & continue.
         console.warn("wallet sign-in skipped:", (err as Error)?.message ?? err);
