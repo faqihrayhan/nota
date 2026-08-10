@@ -352,39 +352,47 @@ const unsub = subscribeToTransactions(() => loadHistory());
           </div>
         </div>
       ) : (
-        /* Scan QR section */
+        /* Scan QR section — rectangle card, camera-first (mobile-first) */
         <div className="rounded-2xl border border-ink-line/40 bg-ink-2/30 p-6">
-          <h3 className="font-display text-sm font-semibold">Scan QR Code</h3>
+          <div className="flex items-center gap-2 text-accent">
+            <ScanLine className="h-5 w-5" />
+            <h3 className="font-display text-sm font-semibold">Scan QR Code</h3>
+          </div>
           <p className="mt-1 text-xs text-text-muted">Point your camera at a payment QR code, or paste the QR data below.</p>
-          <div className="mt-4 flex gap-3">
+
+          {/* Camera / scan area — rectangle block */}
+          <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-ink-line/50 bg-ink/40 px-4 py-10">
+            <Camera className="h-8 w-8 text-accent" />
             <button
               onClick={() => setCameraOpen(true)}
               className={cn(
-                "inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm font-medium text-accent transition-all",
+                "inline-flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-6 py-3 text-sm font-medium text-accent transition-all",
                 "hover:bg-accent/20 hover:shadow-lg hover:shadow-accent/10"
               )}
             >
               <Camera className="h-4 w-4" />
               {t("payment.openCamera")}
             </button>
-            <span className="flex items-center text-[11px] font-mono uppercase tracking-widest text-text-faint">{t("payment.or")}</span>
-            <input
-              type="text"
-              value={scanInput}
-              onChange={(e) => setScanInput(e.target.value)}
-              placeholder={t("payment.scanPlaceholder")}
-              className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            <button
-              onClick={handleScan}
-              className={cn(
-                "inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition-all",
-                "hover:bg-accent-strong hover:shadow-lg hover:shadow-accent/20"
-              )}
-            >
-              <ScanLine className="h-4 w-4" />
-              {t("payment.scanButton")}
-            </button>
+            <span className="text-[11px] font-mono uppercase tracking-widest text-text-faint">{t("payment.or")}</span>
+            <div className="flex w-full max-w-md gap-2">
+              <input
+                type="text"
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                placeholder={t("payment.scanPlaceholder")}
+                className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <button
+                onClick={handleScan}
+                className={cn(
+                  "inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition-all",
+                  "hover:bg-accent-strong hover:shadow-lg hover:shadow-accent/20"
+                )}
+              >
+                <ScanLine className="h-4 w-4" />
+                {t("payment.scanButton")}
+              </button>
+            </div>
           </div>
         </div>
       )}
