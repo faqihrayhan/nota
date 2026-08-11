@@ -49,7 +49,6 @@ contract NotaInvoiceManager is Initializable, UUPSUpgradeable, OwnableUpgradeabl
 
     function initialize(address _usdc) public initializer {
         __Ownable_init(msg.sender);
-        __UUPSUpgradeable_init();
         usdc = IERC20(_usdc);
     }
 

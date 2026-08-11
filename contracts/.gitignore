@@ -1,0 +1,4 @@
+# Foundry overrides
+out/
+cache/
+.forge-build/
