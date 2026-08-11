@@ -9,6 +9,7 @@ import {
   findTransactionByNonce,
   subscribeToTransactions,
   getTransactions,
+  deductStockAfterPayment,
   type Transaction,
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
@@ -206,6 +207,11 @@ const unsub = subscribeToTransactions(() => loadHistory());
       };
 
       await saveTransaction(tx);
+      try {
+        await deductStockAfterPayment(payeeAddress, scannedData.items);
+      } catch (stockErr) {
+        console.error("Failed to deduct stock:", stockErr);
+      }
       await loadHistory();
       setSuccessTx(tx as Transaction);
       setScannedData(null);

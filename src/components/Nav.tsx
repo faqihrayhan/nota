@@ -1,20 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { WalletButton } from "@/components/WalletButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import {
   BookOpen, FileText, Code, HelpCircle, ExternalLink, ChevronDown,
   CreditCard, BarChart3, TrendingUp, Layers, Store,
-} 
-
-
-from "lucide-react";
+} from "lucide-react";
 
 export function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -49,10 +47,12 @@ export function Nav() {
   }, []);
 
   const featureItems = [
-    { icon: CreditCard, title: t("nav.payment"), href: "/payment" },
-    { icon: Store, title: t("nav.merchant"), href: "/merchant" },
-    { icon: BarChart3, title: t("nav.analisa"), href: "/analisa" },
-    { icon: TrendingUp, title: t("nav.forecast"), href: "/forecast" },
+    { icon: CreditCard, title: t("nav.payment"), desc: "Scan & Pay", href: "/payment" },
+    { icon: Store, title: t("nav.merchant"), desc: "Manage Your Merchant",href: "/merchant" },
+    { icon: BarChart3, title: t("nav.analisa"), desc: "Financial Analysis", href: "/analisa" },
+    { icon: TrendingUp, title: t("nav.forecast"), desc: "AI Forecasting", href: "/forecast" },
+    { icon: Layers, title: t("nav.split-bill") , desc: "Split Your Payment", href: "/split-bill" },
+    { icon: HelpCircle, title: t("nav.score"), desc: "On-chain score", href: "/score" },
   ];
 
   const docsItems = [
@@ -66,7 +66,13 @@ export function Nav() {
     <header className={cn("sticky top-0 z-50 transition-all duration-500", scrolled || menuOpen ? "border-b border-ink-line/60 bg-ink/95 backdrop-blur-2xl shadow-[0_1px_40px_-12px_rgba(0,0,0,0.4)]" : "border-b border-transparent bg-ink/50 backdrop-blur-md")}>
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
         <Link href="/" className="group flex items-center gap-2.5 transition-all duration-300">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-paper-white font-display text-sm font-bold text-paper-ink shadow-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-paper-white/10 group-hover:scale-105 group-hover:rotate-[-3deg]">N</span>
+          <Image
+            src="/notaicon.svg"
+            alt="Nota Icon"
+            width={36}
+            height={36}
+            className="h-9 w-9 object-contain transition-transform duration-300 group-hover:scale-105 group-hover:rotate-[-3deg]"
+          />
           <span className="font-display text-lg font-semibold tracking-tight text-text transition-colors duration-300 group-hover:text-text/80">Nota</span>
         </Link>
 
@@ -76,7 +82,7 @@ export function Nav() {
             href="/#how-it-works"
             className="relative px-4 py-2 text-sm rounded-xl transition-all duration-300 group flex items-center gap-2 text-text-muted hover:text-text hover:bg-white/[0.03]"
           >
-            <Layers className="h-4 w-4" />
+            <Layers className="h-4 w-4 relative top-[0.5px]" />
             <span className="relative z-10">{t("nav.howItWorks")}</span>
           </Link>
 
@@ -89,8 +95,8 @@ export function Nav() {
                 featuresOpen ? "text-text bg-white/[0.06]" : "text-text-muted hover:text-text hover:bg-white/[0.03]"
               )}
             >
-              <span>{t("nav.features")}</span>
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300", featuresOpen && "rotate-180")} />
+              <span className="relative top-[0.5px]">{t("nav.features")}</span>
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300 relative top-[0.5px]", featuresOpen && "rotate-180")} />
             </button>
             <div
               className={cn(
@@ -122,8 +128,8 @@ export function Nav() {
           {/* Docs Dropdown */}
           <div className="relative" ref={docsRef}>
             <button onClick={() => setDocsOpen((v) => !v)} className={cn("flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl transition-all duration-300", docsOpen ? "text-text bg-white/[0.06]" : "text-text-muted hover:text-text hover:bg-white/[0.03]")}>
-              <span>Docs</span>
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300", docsOpen && "rotate-180")} />
+              <span className="relative top-[0.5px]">Docs</span>
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300 relative top-[0.5px]", docsOpen && "rotate-180")} />
             </button>
             <div className={cn("absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 overflow-hidden rounded-2xl border border-ink-line/60 bg-ink-2/95 backdrop-blur-2xl shadow-2xl shadow-black/40 transition-all duration-300 origin-top", docsOpen ? "opacity-100 scale-100 translate-y-0 pointer-events-auto" : "opacity-0 scale-95 -translate-y-2 pointer-events-none")}>
               <div className="p-2">

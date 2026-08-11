@@ -4,10 +4,13 @@ import { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { Reveal } from "@/components/Reveal";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 import { 
   CreditCard, 
+  Store,
   BarChart3, 
   TrendingUp, 
+  Users,
   Activity, 
   ArrowRight, 
   Sparkles,
@@ -27,6 +30,15 @@ const PILARS = [
   },
   {
     id: "pilar2",
+    icon: Store,
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-400/10",
+    borderColor: "border-cyan-400/20",
+    href: "/merchant",
+    active: true,
+  },
+  {
+    id: "pilar3",
     icon: BarChart3,
     color: "text-emerald-400",
     bgColor: "bg-emerald-400/10",
@@ -35,7 +47,7 @@ const PILARS = [
     active: true,
   },
   {
-    id: "pilar3",
+    id: "pilar4",
     icon: TrendingUp,
     color: "text-amber-400",
     bgColor: "bg-amber-400/10",
@@ -44,13 +56,22 @@ const PILARS = [
     active: true,
   },
   {
-    id: "pilar4",
+    id: "pilar5",
+    icon: Users,
+    color: "text-rose-400",
+    bgColor: "bg-rose-400/10",
+    borderColor: "border-rose-400/20",
+    href: "/split-bill",
+    active: true,
+  },
+  {
+    id: "pilar6",
     icon: Activity,
     color: "text-purple-400",
     bgColor: "bg-purple-400/10",
     borderColor: "border-purple-400/20",
-    href: "#",
-    active: false,
+    href: "/score",
+    active: true,
   },
 ];
 
@@ -65,7 +86,7 @@ export function FeatureSection() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6">
-        <div className="grid gap-16 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+        <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
           {/* Left Column */}
           <div className="flex flex-col">
             <Reveal delay={0.1}>
@@ -137,7 +158,7 @@ export function FeatureSection() {
           </div>
 
           {/* Right Column: Preview */}
-          <div className="relative">
+          <div className="relative lg:translate-y-[170px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab.id}
@@ -184,13 +205,13 @@ export function FeatureSection() {
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.5 }}
                       >
-                        <a 
+                        <Link
                           href={activeTab.href}
                           className="mt-10 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-6 py-3 text-sm font-medium hover:bg-white/10 transition-colors"
                         >
                           {t("features.open")}
                           <ArrowRight className="h-4 w-4" />
-                        </a>
+                        </Link>
                       </motion.div>
                     )}
                   </div>
