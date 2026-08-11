@@ -20,15 +20,14 @@ import {
   type Transaction,
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
-import {
+import {  
   fetchExchangeRate,
   getCachedRate,
   idrToUsdc,
   usdcToIdr,
   formatIDR,
   formatUSDC,
-  type ExchangeRate,
-} from "@/lib/exchange-rate";
+  type ExchangeRate, type CurrencyCode, CURRENCY_SYMBOLS, fetchLiveRates, convertFromUsdc, convertToUsdc, formatCurrency } from "@/lib/exchange-rate";
 import { cn } from "@/lib/utils";
 import {
   Plus,
@@ -67,7 +66,7 @@ export default function MerchantPage() {
   const { t } = useLanguage();
 
   // UI State
-  const [currencyMode, setCurrencyMode] = useState<"IDR" | "USDC">("IDR");
+  const [currencyMode, setCurrencyMode] = useState<CurrencyCode>("USDC");
 
   // Catalog state
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
@@ -100,6 +99,7 @@ export default function MerchantPage() {
   // Live IDR⇄USDC rate (fetched from CoinGecko; falls back offline)
   const [rate, setRate] = useState<ExchangeRate>(() => getCachedRate());
   const [refreshingRate, setRefreshingRate] = useState(false);
+  const [allRates, setAllRates] = useState<Record<string, number>>({});
 
   // Load data on wallet connect
   useEffect(() => {
@@ -112,8 +112,12 @@ export default function MerchantPage() {
   // Refresh the exchange rate on mount
   useEffect(() => {
     let active = true;
-    fetchExchangeRate().then((r) => {
-      if (active) setRate(r);
+    fetchExchangeRate().then(async (r) => {
+      if (active) {
+        setRate(r);
+        const lRates = await fetchLiveRates();
+        setAllRates(lRates);
+      }
     });
     return () => {
       active = false;
@@ -129,6 +133,8 @@ export default function MerchantPage() {
     try {
       const fresh = await fetchExchangeRate();
       setRate(fresh);
+      const lRates = await fetchLiveRates();
+      setAllRates(lRates);
     } catch {
       // fetchExchangeRate never throws (falls back to default), keep old rate
     } finally {
@@ -175,6 +181,7 @@ console.error("Failed to load cart:", err);
 
   // Cart calculations — harga asli disimpan dalam USDC, IDR adalah turunan.
   const cartTotalUSDC = cart.reduce((sum, item) => sum + item.price_usdc * item.qty, 0);
+  const cartTotalCurrent = convertFromUsdc(cartTotalUSDC, currencyMode, allRates);
   const cartTotalIDR = usdcToIdr(cartTotalUSDC, rate.idrPerUsdc);
   const formattedTotal =
     currencyMode === "IDR" ? formatIDR(cartTotalIDR) : formatUSDC(cartTotalUSDC);
@@ -189,7 +196,7 @@ console.error("Failed to load cart:", err);
     if (!address || !newItemName.trim() || !newItemPrice.trim()) return;
     const priceNum = parseFloat(newItemPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
-    const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
+    const priceUsdc = currencyMode === "USDC" ? priceNum : convertToUsdc(priceNum, currencyMode, allRates);
     const stockNum = newItemStock ? parseFloat(newItemStock) : 0;
     try {
       await addCatalogItem(address, newItemName.trim(), priceUsdc, {
@@ -233,7 +240,7 @@ console.error("Failed to load cart:", err);
     if (!address || !editingItem || !editName.trim() || !editPrice.trim()) return;
     const priceNum = parseFloat(editPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
-    const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
+    const priceUsdc = currencyMode === "USDC" ? priceNum : convertToUsdc(priceNum, currencyMode, allRates);
     const stockNum = editStock ? parseFloat(editStock) : 0;
     try {
       await updateCatalogItem(editingItem.id, editName.trim(), priceUsdc, {
@@ -425,16 +432,16 @@ console.error("Failed to load cart:", err);
                       placeholder={t("merchant.itemName")}
                       className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
                     />
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
-                        {currencyMode === "IDR" ? "Rp" : "$"}
+                    <div className="flex rounded-xl border border-ink-line/40 bg-ink overflow-hidden focus-within:border-primary sm:w-40">
+                      <span className="flex items-center bg-ink-2/80 px-3 text-xs font-semibold text-text-muted border-r border-ink-line/30 select-none">
+                        {CURRENCY_SYMBOLS[currencyMode].trim()}
                       </span>
                       <input
                         type="text"
                         value={newItemPrice}
                         onChange={(e) => setNewItemPrice(e.target.value)}
-                        placeholder={currencyMode === "IDR" ? "25.000" : "1.50"}
-                        className="w-full rounded-xl border border-ink-line/40 bg-ink pl-10 pr-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-32"
+                        placeholder={currencyMode === "USDC" ? "1.50" : "25.000"}
+                        className="w-full bg-transparent px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none"
                       />
                     </div>
                   </div>
@@ -493,18 +500,18 @@ console.error("Failed to load cart:", err);
                             placeholder={t("merchant.itemName")}
                             className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
                           />
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
-                              {currencyMode === "IDR" ? "Rp" : "$"}
-                            </span>
-                            <input
-                              type="text"
-                              value={editPrice}
-                              onChange={(e) => setEditPrice(e.target.value)}
-                              placeholder={currencyMode === "IDR" ? "25.000" : "1.50"}
-                              className="w-full rounded-xl border border-ink-line/40 bg-ink pl-10 pr-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-32"
-                            />
-                          </div>
+                          <div className="flex rounded-xl border border-ink-line/40 bg-ink overflow-hidden focus-within:border-primary sm:w-40">
+                      <span className="flex items-center bg-ink-2/80 px-3 text-xs font-semibold text-text-muted border-r border-ink-line/30 select-none">
+                        {CURRENCY_SYMBOLS[currencyMode].trim()}
+                      </span>
+                      <input
+                        type="text"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder={currencyMode === "USDC" ? "1.50" : "25.000"}
+                        className="w-full bg-transparent px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none"
+                      />
+                    </div>
                           <button
                             type="submit"
                             className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
@@ -584,13 +591,22 @@ console.error("Failed to load cart:", err);
                   <ShoppingCart className="h-5 w-5 text-primary" />
                   <h2 className="font-display text-lg font-semibold">{t("merchant.cart")}</h2>
                 </div>
-                <button
-                  onClick={toggleCurrency}
-className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40 px-3 py-1.5 text-xs font-medium text-text-muted transition-all hover:bg-ink-2 hover:text-text"
-                >
-                  <RefreshCcw className="h-3 w-3" />
-                  {t("merchant.show")} {currencyMode === "IDR" ? "USDC" : "IDR"}
-                </button>
+                <div className="inline-flex items-center rounded-xl border border-ink-line/40 bg-ink-2/60 p-1">
+                  {(["USDC", "IDR", "MYR", "SGD"] as const).map((curr) => (
+                    <button
+                      key={curr}
+                      onClick={() => setCurrencyMode(curr)}
+                      className={cn(
+                        "rounded-lg px-2.5 py-1 text-xs font-medium transition-all",
+                        currencyMode === curr
+                          ? "bg-accent text-white shadow-sm font-semibold"
+                          : "text-text-muted hover:text-text hover:bg-white/5"
+                      )}
+                    >
+                      {curr === "USDC" ? "🇺🇸 USDC" : curr === "IDR" ? "🇮🇩 IDR" : curr === "MYR" ? "🇲🇾 MYR" : "🇸🇬 SGD"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className={cn("rounded-2xl border transition-all", cart.length === 0 ? "border-ink-line/30 bg-ink-2/20" : "border-primary/30 bg-primary/5")}> 
@@ -621,9 +637,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                           <div className="flex-1">
                             <p className="font-medium text-text">{item.item_name}</p>
                             <p className="text-sm text-text-muted">
-                              {currencyMode === "IDR"
-                                ? `${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))} × ${item.qty}`
-                                : `${formatUSDC(item.price_usdc)} × ${item.qty}`}
+                              {`${formatCurrency(convertFromUsdc(item.price_usdc, currencyMode, allRates), currencyMode)} × ${item.qty}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
@@ -657,13 +671,13 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                     <div className="border-t border-ink-line/30 p-4">
                       <div className="flex justify-between text-sm mb-2">
 <span className="text-text-muted">{t("merchant.subtotal")}</span>
-                        <span>{formatIDR(cartTotalIDR)}</span>
+                        <span>{formatCurrency(convertFromUsdc(cartTotalUSDC, currencyMode, allRates), currencyMode)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold">{t("merchant.total")}</span>
                         <span className="font-bold text-primary">{formattedTotal}</span>
                       </div>
-                      {currencyMode === "IDR" && (
+                      {currencyMode !== "USDC" && (
                         <div className="mt-1 text-right text-xs text-text-muted">
                           ≈ {formatUSDC(cartTotalUSDC)}
                         </div>
@@ -726,7 +740,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
 
               <div className="text-center mb-4">
                 <p className="text-2xl font-bold text-primary">{formattedTotal}</p>
-                {currencyMode === "IDR" && (
+                {currencyMode !== "USDC" && (
                   <p className="text-sm text-text-muted">≈ {formatUSDC(cartTotalUSDC)}</p>
                 )}
               </div>
