@@ -13,6 +13,7 @@ import {
   type Transaction,
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
+import { type CurrencyCode, CURRENCY_SYMBOLS, fetchLiveRates, convertFromUsdc, formatCurrency } from "@/lib/exchange-rate";
 import { QRScanner } from "@/components/QRScanner";
 import ReceiptModal from "@/components/ReceiptModal";
 import { cn } from "@/lib/utils";
@@ -97,14 +98,25 @@ function PaymentPageInner() {
   const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
   const [history, setHistory] = useState<Transaction[]>([]);
   const [copied, setCopied] = useState(false);
+  const [currencyMode, setCurrencyMode] = useState<CurrencyCode>("USDC");
+  const [allRates, setAllRates] = useState<Record<string, number>>({});
 
   // Load transaction history when wallet connects
   useEffect(() => {
+    fetchLiveRates().then(setAllRates);
     if (!address) return;
     loadHistory();
 const unsub = subscribeToTransactions(() => loadHistory());
     return () => unsub();
   }, [address]);
+
+  const toggleCurrency = () => {
+    const sequence: CurrencyCode[] = ["USDC", "IDR", "MYR", "SGD"];
+    setCurrencyMode((m) => {
+      const idx = sequence.indexOf(m);
+      return sequence[(idx + 1) % sequence.length];
+    });
+  };
 
   async function loadHistory() {
     if (!address) return;
@@ -326,7 +338,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
           <div className="mt-6 space-y-2 rounded-xl border border-ink-line/30 bg-ink p-4 text-left">
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">{t("payment.amount")}</span>
-              <span className="font-medium">{formatUSDC(successTx.amount)} USDC</span>
+              <span className="font-medium">{formatCurrency(convertFromUsdc(successTx.amount, currencyMode, allRates), currencyMode)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">{t("payment.txHash")}</span>
@@ -429,7 +441,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium">{formatUSDC(tx.amount)} USDC</p>
+                  <p className="text-sm font-medium">{formatCurrency(convertFromUsdc(tx.amount, currencyMode, allRates), currencyMode)}</p>
                   <p className={cn(
                     "text-xs capitalize",
                     tx.status === "confirmed" ? "text-stamp-green" : tx.status === "failed" ? "text-warn-amber" : "text-text-muted"
