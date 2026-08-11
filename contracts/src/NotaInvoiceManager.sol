@@ -65,7 +65,7 @@ contract NotaInvoiceManager is Initializable, UUPSUpgradeable, OwnableUpgradeabl
             payee: msg.sender,
             amount: _amount,
             dataHash: _dataHash,
-            bool paid: false
+            paid: false
         });
 
         emit InvoiceCreated(id, _payer, msg.sender, _amount, _dataHash);
