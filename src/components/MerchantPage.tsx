@@ -73,11 +73,15 @@ export default function MerchantPage() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
+  const [newItemStock, setNewItemStock] = useState("");
+  const [newItemBatch, setNewItemBatch] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editStock, setEditStock] = useState("");
+  const [editBatch, setEditBatch] = useState("");
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -186,10 +190,16 @@ console.error("Failed to load cart:", err);
     const priceNum = parseFloat(newItemPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
     const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
+    const stockNum = newItemStock ? parseFloat(newItemStock) : 0;
     try {
-      await addCatalogItem(address, newItemName.trim(), priceUsdc);
+      await addCatalogItem(address, newItemName.trim(), priceUsdc, {
+        stock: stockNum,
+        batch_no: newItemBatch.trim() || undefined,
+      });
       setNewItemName("");
       setNewItemPrice("");
+      setNewItemStock("");
+      setNewItemBatch("");
       setIsAdding(false);
       await loadCatalog();
     } catch (err) {
@@ -205,6 +215,8 @@ console.error("Failed to load cart:", err);
     setEditPrice(currencyMode === "IDR"
       ? Math.round(usdcToIdr(item.price_usdc, rate.idrPerUsdc)).toString()
       : item.price_usdc.toString());
+    setEditStock(item.stock != null ? item.stock.toString() : "");
+    setEditBatch(item.batch_no || "");
     setIsAdding(false);
   }
 
@@ -212,6 +224,8 @@ console.error("Failed to load cart:", err);
     setEditingItem(null);
     setEditName("");
     setEditPrice("");
+    setEditStock("");
+    setEditBatch("");
   }
 
   async function handleSaveEdit(e: React.FormEvent) {
@@ -220,8 +234,12 @@ console.error("Failed to load cart:", err);
     const priceNum = parseFloat(editPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
     const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
+    const stockNum = editStock ? parseFloat(editStock) : 0;
     try {
-      await updateCatalogItem(editingItem.id, editName.trim(), priceUsdc);
+      await updateCatalogItem(editingItem.id, editName.trim(), priceUsdc, {
+        stock: stockNum,
+        batch_no: editBatch.trim() || undefined,
+      });
       cancelEditItem();
       await loadCatalog();
     } catch (err) {
@@ -398,7 +416,7 @@ console.error("Failed to load cart:", err);
 
               {/* Add item form */}
               {isAdding && (
-                <form onSubmit={handleAddToCatalog} className="rounded-2xl border border-primary/30 bg-ink-2/50 p-4">
+                <form onSubmit={handleAddToCatalog} className="rounded-2xl border border-primary/30 bg-ink-2/50 p-4 space-y-3">
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <input
                       type="text"
@@ -407,7 +425,7 @@ console.error("Failed to load cart:", err);
                       placeholder={t("merchant.itemName")}
                       className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
                     />
-<div className="relative">
+                    <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
                         {currencyMode === "IDR" ? "Rp" : "$"}
                       </span>
@@ -419,9 +437,27 @@ console.error("Failed to load cart:", err);
                         className="w-full rounded-xl border border-ink-line/40 bg-ink pl-10 pr-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-32"
                       />
                     </div>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      type="number"
+                      value={newItemStock}
+                      onChange={(e) => setNewItemStock(e.target.value)}
+                      placeholder="Stok (e.g. 100)"
+                      className="w-full rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-1/2"
+                    />
+                    <input
+                      type="text"
+                      value={newItemBatch}
+                      onChange={(e) => setNewItemBatch(e.target.value)}
+                      placeholder="No. Batch / SKU (Opsional)"
+                      className="w-full rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-1/2"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-1">
                     <button
                       type="submit"
-                      className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
+                      className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
                     >
                       {t("merchant.add")}
                     </button>
@@ -490,7 +526,19 @@ console.error("Failed to load cart:", err);
                       className="group flex items-center justify-between rounded-2xl border border-ink-line/30 bg-ink-2/20 p-4 transition-all hover:border-ink-line/60 hover:bg-ink-2/40"
                     >
                       <div>
-                        <p className="font-medium text-text">{item.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-text">{item.name}</p>
+                          {item.stock != null && item.stock > 0 && (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                              Stok: {item.stock}
+                            </span>
+                          )}
+                          {item.batch_no && (
+                            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                              Batch: {item.batch_no}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-text-muted">
                           {formatUSDC(item.price_usdc)}
                           {currencyMode === "IDR" && ` ≈ ${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))}`}

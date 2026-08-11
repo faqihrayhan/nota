@@ -79,7 +79,7 @@ export function ScorePage() {
           Nota Score
         </h1>
         <p className="mt-4 text-lg text-text-muted">
-          Reputasi finansial on-chain Anda di ekosistem Arc.
+          Your Financial Reputation On Arc network
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export function ScorePage() {
                 </div>
                 <h3 className="text-xl font-semibold text-text">Trust Reputation</h3>
                 <p className="mt-2 max-w-xs text-sm text-text-muted">
-                  Skor Anda didasarkan pada histori pembayaran USDC dan settlement on-chain di jaringan Arc.
+                  Your Scores Based On History Payment and Settlement On Arc Testnet
                 </p>
               </div>
 
@@ -147,7 +147,7 @@ export function ScorePage() {
                 <h4 className="font-semibold">Improve Score</h4>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-text-muted">
-                Lakukan lebih banyak transaksi on-chain menggunakan fitur Payment atau Split Bill untuk membangun histori yang kuat.
+                Do more transaction on Arc Testnet with Using Features Payment Or Split Bill For making Great Scores.
               </p>
             </div>
           </div>
