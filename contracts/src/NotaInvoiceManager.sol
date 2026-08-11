@@ -2,22 +2,17 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/**
- * @title NotaInvoiceManager
- * @dev Manages verifiable invoices and on-chain split bills on Arc Network.
- */
-contract NotaInvoiceManager is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract NotaInvoiceManager is Initializable, OwnableUpgradeable {
     IERC20 public usdc;
 
     struct Invoice {
         address payer;
         address payee;
         uint256 amount;
-        bytes32 dataHash; // Off-chain metadata reference
+        bytes32 dataHash;
         bool paid;
     }
 
@@ -47,16 +42,11 @@ contract NotaInvoiceManager is Initializable, UUPSUpgradeable, OwnableUpgradeabl
         _disableInitializers();
     }
 
-    function initialize(address _usdc) public initializer {
+    function initialize(address _usdc) external initializer {
         __Ownable_init(msg.sender);
         usdc = IERC20(_usdc);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    /**
-     * @dev Create a verifiable invoice.
-     */
     function createInvoice(address _payer, uint256 _amount, bytes32 _dataHash) external returns (uint256) {
         uint256 id = ++invoiceCount;
         invoices[id] = Invoice({
@@ -71,9 +61,6 @@ contract NotaInvoiceManager is Initializable, UUPSUpgradeable, OwnableUpgradeabl
         return id;
     }
 
-    /**
-     * @dev Pay an invoice using USDC.
-     */
     function payInvoice(uint256 _id) external {
         Invoice storage inv = invoices[_id];
         require(!inv.paid, "Already paid");
@@ -85,9 +72,6 @@ contract NotaInvoiceManager is Initializable, UUPSUpgradeable, OwnableUpgradeabl
         emit InvoicePaid(_id, msg.sender, inv.amount);
     }
 
-    /**
-     * @dev Create a split bill.
-     */
     function createSplit(uint256 _totalAmount, address[] calldata _participants, uint256[] calldata _shares, bytes32 _dataHash) external returns (uint256) {
         require(_participants.length == _shares.length, "Mismatched arrays");
         
@@ -106,9 +90,6 @@ contract NotaInvoiceManager is Initializable, UUPSUpgradeable, OwnableUpgradeabl
         return id;
     }
 
-    /**
-     * @dev Pay a share of a split bill.
-     */
     function paySplit(uint256 _id) external {
         SplitBill storage s = splits[_id];
         require(!s.completed, "Split completed");
