@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { getTransactions, type Transaction } from "@/lib/supabase";
+import { getTransactions, getIncomingTransactions, type Transaction } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import {
   TrendingUp,
@@ -65,6 +65,7 @@ export default function ForecastPage() {
   const { t } = useLanguage();
   const [period, setPeriod] = useState<Period>("month");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [incoming, setIncoming] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -76,6 +77,9 @@ export default function ForecastPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    getIncomingTransactions(wallet.address)
+      .then(setIncoming)
+      .catch(() => {});
   }, [wallet.address]);
 
   const periodStart = getPeriodStart(period);
@@ -121,6 +125,24 @@ export default function ForecastPage() {
 
   const totalForecast = Object.values(categoryTrends).reduce((sum, t) => sum + t.forecast, 0);
   const totalAvg = Object.values(categoryTrends).reduce((sum, t) => sum + t.avg, 0);
+
+  // Inflow projection (payments received to this wallet)
+  const monthlyInflow = useMemo(() => {
+    const data: Record<string, number> = {};
+    incoming.forEach((tx) => {
+      if (tx.status === "failed") return;
+      const month = getMonthKey(tx.created_at);
+      data[month] = (data[month] || 0) + tx.amount;
+    });
+    return data;
+  }, [incoming]);
+
+  const inflowMonths = Object.keys(monthlyInflow).sort();
+  const totalInflow = Object.values(monthlyInflow).reduce((a, b) => a + b, 0);
+  const avgInflow = inflowMonths.length > 0 ? totalInflow / inflowMonths.length : 0;
+  const inflowForecast = inflowMonths.length >= 2
+    ? (monthlyInflow[inflowMonths[inflowMonths.length - 1]] || 0) * 1.05
+    : avgInflow;
 
   if (!wallet.address) {
     return (
@@ -181,7 +203,7 @@ export default function ForecastPage() {
         </div>
       ) : (
         <div className="mt-8 space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
               <div className="flex items-center gap-2 text-text-muted">
                 <Calendar className="h-4 w-4" />
@@ -200,15 +222,19 @@ export default function ForecastPage() {
             </div>
             <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
               <div className="flex items-center gap-2 text-text-muted">
-                <ArrowUpRight className="h-4 w-4" />
-                <span className="text-xs font-mono uppercase">{t("forecast.variance")}</span>
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-xs font-mono uppercase">{t("forecast.avgInflow")}</span>
               </div>
-              <p className={cn("mt-2 font-display text-2xl font-semibold", totalForecast > totalAvg ? "text-warn-amber" : "text-stamp-green")}>
-                {totalAvg > 0 ? `${((totalForecast - totalAvg) / totalAvg * 100).toFixed(1)}%` : "0%"}
-              </p>
-              <p className="mt-1 text-xs text-text-faint">
-                {totalForecast > totalAvg ? t("forecast.higher") : t("forecast.lower")}
-              </p>
+              <p className="mt-2 font-display text-2xl font-semibold text-stamp-green">{formatUSDC(avgInflow)} USDC</p>
+              <p className="mt-1 text-xs text-text-faint">{t("forecast.perMonthInflow")}</p>
+            </div>
+            <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
+              <div className="flex items-center gap-2 text-text-muted">
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-xs font-mono uppercase">{t("forecast.nextInflow")}</span>
+              </div>
+              <p className="mt-2 font-display text-2xl font-semibold text-stamp-green">{formatUSDC(inflowForecast)} USDC</p>
+              <p className="mt-1 text-xs text-text-faint">{t("forecast.projectedInflow")}</p>
             </div>
           </div>
 
@@ -289,6 +315,15 @@ export default function ForecastPage() {
                 <p className="mt-2 text-sm text-text-muted leading-relaxed">
                   {t("forecast.insightDesc")}
                 </p>
+                {inflowMonths.length > 0 && (
+                  <p className="mt-2 text-sm text-text-muted leading-relaxed">
+                    {t("forecast.insightInflow")} <strong className="text-stamp-green">{formatUSDC(avgInflow)} USDC</strong>{" "}
+                    {t("forecast.perMonthInflow")}
+                    {inflowForecast > avgInflow && avgInflow > 0
+                      ? ` · ${t("forecast.insightInflowUp")} ${((inflowForecast - avgInflow) / avgInflow * 100).toFixed(0)}%`
+                      : ""}
+                  </p>
+                )}
               </div>
             </div>
           </div>
