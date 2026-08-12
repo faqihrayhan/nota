@@ -1,8 +1,76 @@
 ---
 title: "Verifiable Accounting"
-description: "How Nota secures financial records"
+description: "How Nota guarantees cryptographic proof and tamper-resistant financial records on Arc Network"
 ---
 
-# Verifiable Accounting
+# Verifiable Accounting Protocol
 
-Nota uses cryptographic hashing to anchor receipt data onto the Arc blockchain.
+In traditional business accounting, receipts and invoice ledgers are stored in centralized databases subject to silent manipulation, missing audit trails, or fraudulent double-entry recording. 
+
+**Nota** solves this by introducing **Verifiable On-Chain Accounting** — anchored directly onto **Arc Network** using cryptographic hashing and instant USDC settlement.
+
+---
+
+## 1. Core Principles
+
+```
+  +--------------------+         +-----------------------+         +---------------------+
+  | Merchant Payment   | ------> | Off-Chain Payload     | ------> | Keccak-256 Hashing  |
+  | Request (USDC)     |         | Items, Amount, Nonce  |         | (Deterministic)     |
+  +--------------------+         +-----------------------+         +---------------------+
+                                                                              |
+  +--------------------+         +-----------------------+                    |
+  | Independent Audit  | <------ | ArcScan Blockchain    | <------------------+
+  | Proof via Hash     |         | ReceiptAnchored Log   |
+  +--------------------+         +-----------------------+
+```
+
+1. **Tamper-Evident Receipts**: Offline receipts (PDF/PNG/JSON) can be mathematically verified against the Arc blockchain at any time.
+2. **Deterministic Hash Verification**: Any modification to line items, total amount, merchant address, or timestamp alters the resulting hash, rendering tampered receipts immediately invalid.
+3. **Double-Entry Elimination**: Both merchant and customer share a single, immutable source of truth anchored on Arc EVM.
+4. **Privacy-Preserving Proof**: Detailed line items (e.g., individual invoice goods) remain private in the merchant/customer storage, while only the un-reversible cryptographic `dataHash` is published on-chain.
+
+---
+
+## 2. Receipt Lifecycle & Verification Workflow
+
+### Step 1: Payload Generation
+When a transaction is initiated, Nota constructs a canonical payload string:
+```json
+{
+  "merchant": "0x1234...5678",
+  "payer": "0x9876...4321",
+  "amountUSDC": "150.00",
+  "currency": "USDC",
+  "items": [
+    { "name": "Software License", "price": "100.00", "qty": 1 },
+    { "name": "Setup Fee", "price": "50.00", "qty": 1 }
+  ],
+  "nonce": "0xa9f8c12...",
+  "timestamp": 1770800000
+}
+```
+
+### Step 2: On-Chain Anchoring
+The application calculates the `dataHash` and executes a settlement transaction on Nota's Arc smart contract:
+```solidity
+// Triggers on-chain state update and emits verifiable log
+emit ReceiptAnchored(dataHash, merchant, payer, amountUSDC, block.timestamp);
+```
+
+### Step 3: Independent Verification (ArcScan)
+To verify a digital PDF or PNG receipt:
+1. Upload the receipt file or payload into Nota's verification tool or run the standalone hash validator.
+2. Re-calculate `keccak256(payload)`.
+3. Query **ArcScan** for `ReceiptAnchored` events matching `dataHash`.
+4. If the hashes match, the record is **100% Verified Genuine**.
+
+---
+
+## 3. Financial Reporting & Cashflow Insights
+
+Nota doesn't just store receipts — it transforms raw on-chain transaction logs into verifiable financial statements:
+
+- **Two-Sided Cashflow Analytics**: Real-time breakdown of Inflow (Revenue) vs Outflow (Expenses) settled in USDC.
+- **Auditor-Ready Exports**: Export verified CSV reports paired with transaction hashes (`txHash`) and block numbers for seamless tax and compliance reporting.
+- **AI-Powered Forecasting**: Predictive cashflow trends based on historical on-chain settlement velocity.
