@@ -3,8 +3,8 @@
   "theme": "mint",
   "name": "Nota on Arc",
   "logo": {
-    "light": "/images/notaicon.svg",
-    "dark": "/images/notaicon.svg"
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
   },
   "favicon": "/favicon.png",
   "colors": {
@@ -28,6 +28,7 @@
             "group": "Core Concepts",
             "pages": [
               "docs/core-concepts/verifiable-accounting",
+              "docs/core-concepts/architecture-and-security",
               "docs/core-concepts/arc-integration"
             ]
           },
@@ -45,17 +46,5 @@
   "footerSocials": {
     "x": "https://x.com/notaonarc",
     "github": "https://github.com/faqihrayhan/nota"
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/notaonarc",
-      "github": "https://github.com/faqihrayhan/nota"
-    }
-  },
-  "navbar": {
-    "links": []
-  },
-  "thumbnails": {
-    "appearance": "dark"
   }
 }

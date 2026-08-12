@@ -1,0 +1,83 @@
+---
+title: "Technical Architecture & Security"
+description: "Comprehensive technical overview of Nota's infrastructure, database security, and smart contract protocol on Arc Network"
+---
+
+# Technical Architecture & Security Overview
+
+Nota is a Web3-native, verifiable accounting and payment settlement platform built on **Arc Network**. This document details the end-to-end technical stack, security architecture, Row-Level Security (RLS) policies, and smart contract design.
+
+---
+
+## 1. System Architecture Stack
+
+| Layer | Component / Technology | Primary Role |
+| :--- | :--- | :--- |
+| **Frontend UI** | Next.js 16 (App Router) + Tailwind CSS + Framer Motion | Server-rendered UI with high-performance client hydration |
+| **Blockchain L1/L2** | Arc Network (EVM Testnet/Mainnet) | Instant USDC settlement & on-chain receipt dataHash anchoring |
+| **Smart Contracts** | Solidity 0.8.24 + UUPS Proxy (OpenZeppelin) | Upgradeable payment processing & cryptographic receipt hashing |
+| **Database & Auth** | Supabase Postgres + Custom Wallet JWT Auth | Stateful merchant catalogs, QR payloads, and per-wallet RLS |
+| **Documentation** | Mintlify (`notapay.mintlify.site`) | MDX-driven technical documentation |
+
+---
+
+## 2. Row-Level Security (RLS) & Multi-Tenant Data Isolation
+
+Nota enforces strict multi-tenant data isolation at the database layer using Supabase PostgreSQL **Row-Level Security (RLS)** coupled with custom **EVM Wallet JWT Sign-In**.
+
+### Auth & JWT Token Lifecycle
+1. Merchant signs a cryptographic challenge message using their EVM Wallet (MetaMask / Arc Wallet).
+2. Backend verifies the signature on-chain/EVM-side and issues a short-lived **Supabase JWT** containing `sub: <wallet_address>`.
+3. All subsequent REST / Realtime requests pass this Bearer JWT token.
+
+### RLS Policies
+
+```sql
+-- Enable RLS on Merchant Catalogs & Transactions
+ALTER TABLE merchant_catalog ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transaction_history ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Merchants can only READ and WRITE their own catalog items
+CREATE POLICY merchant_catalog_isolation ON merchant_catalog
+  FOR ALL
+  USING (wallet_address = auth.jwt() ->> 'sub')
+  WITH CHECK (wallet_address = auth.jwt() ->> 'sub');
+
+-- Policy: Transactions are accessible only by the payer or the merchant wallet
+CREATE POLICY transaction_participant_isolation ON transaction_history
+  FOR SELECT
+  USING (
+    payer_address = auth.jwt() ->> 'sub' OR 
+    merchant_address = auth.jwt() ->> 'sub'
+  );
+```
+
+---
+
+## 3. Smart Contract & Cryptographic Anchoring (dataHash)
+
+Nota's smart contracts implement the **Universal Upgradeable Proxy Standard (UUPS)** to guarantee security and future protocol upgrades without state migration.
+
+### `dataHash` Verification Protocol
+When a payment is processed on Arc, Nota generates a deterministic cryptographic `dataHash`:
+
+$$\text{dataHash} = \text{keccak256}(\text{merchant} \parallel \text{payer} \parallel \text{amountUSDC} \parallel \text{nonce} \parallel \text{timestamp})$$
+
+1. **On-Chain Event**: The `ReceiptAnchored` event emits `(bytes32 dataHash, address merchant, uint256 amount)` to Arc EVM logs.
+2. **ArcScan Verification**: Anyone holding a PDF/PNG receipt can re-hash the offline payload and compare it against the `dataHash` on **ArcScan** to prove the receipt has not been tampered with.
+
+---
+
+## 4. Realtime Payment Polling & Anti-Simulation Rules
+
+To maintain production integrity, Nota **bans simulated/fake delay data**. 
+
+- **Realtime Polling Loop**: The payment client polls Arc RPC logs every **2 seconds** for active transactions, with a **30-second timeout window**.
+- **Receipt Verification**: Once the transaction receipt (`txReceipt`) is confirmed on-chain, the status transitions instantly to `SETTLED`.
+
+---
+
+## 5. Multi-Currency Adaptability & Oracle Rates
+
+- **USDC-First Native Currency**: All accounting records and smart contract settlements operate in **USDC**.
+- **Realtime Fiat Conversion**: Live price feeds (e.g. CoinGecko API) dynamically convert USDC into **IDR, MYR, SGD, and USD** for local merchant convenience without modifying the underlying blockchain settlement value.
