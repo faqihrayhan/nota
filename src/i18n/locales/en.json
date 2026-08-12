@@ -127,12 +127,7 @@
   "merchant.viewAllTx": "View all transactions",
   "merchant.paymentQR": "Payment QR Code",
   "merchant.copyQR": "Copy QR data",
-  "merchant.forTesting": "For testing:",
-  "merchant.simulatePayment": "Simulate Payment Received",
-  "merchant.paymentReceived": "Payment Received!",
-  "merchant.receivedSuccessfully": "received successfully.",
-  "merchant.viewOnExplorer": "View on explorer",
-  "merchant.done": "Done",
+  "merchant.paymentReceived": "payment received",
   "merchant.recentTx": "Recent Transactions",
   "merchant.failedToLoadCatalog": "Failed to load catalog. Check Supabase connection.",
   "merchant.failedToAddItem": "Failed to add item to catalog",
@@ -313,7 +308,6 @@
   "analisa.insightNetPositive": "You're net positive — you received",
   "analisa.insightNetNegative": "You're net negative — you spent",
   "merchant.newPaymentDetected": "New payment detected!",
-  "merchant.paymentReceived": "payment received",
   "merchant.paymentsReceived": "payments received",
   "merchant.realtimeActive": "Realtime active"
 }
