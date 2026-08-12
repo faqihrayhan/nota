@@ -87,18 +87,18 @@
 - [x] Receipt PDF & PNG Generator + Tombol & QR Verifikasi ArcScan (*Digital Receipt Modal*)
 
 ### Phase 2 — Core Product: Smart Contract di Testnet
-- [ ] Setup Foundry / Hardhat environment di `~/projects/nota/contracts/`
-- [ ] Tulis smart contract `NotaInvoiceManager.sol` (UUPS Proxy + `dataHash` anchor + Dual USDC Interface)
-- [ ] Unit testing (Coverage > 95%)
-- [ ] Deploy ke Arc Testnet (`Chain ID 5042002`)
-- [ ] Integrasi UI Payment frontend ke contract yang di-deploy
+- [x] Setup Foundry / Hardhat environment di `~/projects/nota/contracts/`
+- [x] Tulis smart contract `NotaInvoiceManager.sol` (UUPS Proxy + `dataHash` anchor + Dual USDC Interface)
+- [x] Unit testing (Coverage > 95%) — **100% line/statement/branch/func (21/21 tests pass)**
+- [x] Deploy ke Arc Testnet (`Chain ID 5042002`) — **Proxy `0x7a6645d96c6644c9c4c0601c9b0df05358559c1c` (verified di ArcScan)**
+- [x] Integrasi UI Payment frontend ke contract yang di-deploy (`src/lib/invoice-manager.ts`)
 - [ ] QR Payload HMAC Signature (Anti-forge)
 
 ### Phase 3 — Accounting Analytics & Merchant Inflow (CURRENT)
 - [ ] Merchant Inflow Dashboard & Revenue Stats (Harian / Bulanan)
-- [ ] Payer Outflow Analytics enhancements
-- [ ] Export Accounting Report (CSV / PDF)
-- [ ] Integrasi frontend React/Wagmi ke deployed smart contract `NotaInvoiceManager` di Arc Testnet
+- [x] Payer Outflow Analytics enhancements (cashflow inflow/outflow/net + trend + insight di AnalisaPage)
+- [x] Export Accounting Report CSV (client-side Blob, anti CSV-injection)
+- [ ] Export Accounting Report PDF
 
 ### Phase 4 — Mainnet Launch & Public Repo
 - [ ] Buka repo GitHub menjadi Public
