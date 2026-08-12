@@ -28,7 +28,7 @@ contract NotaInvoiceManager is Initializable, OwnableUpgradeable {
 
     uint256 public invoiceCount;
     mapping(uint256 => Invoice) public invoices;
-    
+
     uint256 public splitCount;
     mapping(uint256 => SplitBill) private splits;
 
@@ -96,7 +96,7 @@ contract NotaInvoiceManager is Initializable, OwnableUpgradeable {
 
     function createSplit(uint256 _totalAmount, address[] calldata _participants, uint256[] calldata _shares, bytes32 _dataHash) external returns (uint256) {
         require(_participants.length == _shares.length, "Mismatched arrays");
-        
+
         uint256 id = ++splitCount;
         SplitBill storage s = splits[id];
         s.host = msg.sender;
@@ -120,9 +120,20 @@ contract NotaInvoiceManager is Initializable, OwnableUpgradeable {
 
         uint256 share = s.shares[msg.sender];
         s.hasPaid[msg.sender] = true;
-        
+
         require(usdc.transferFrom(msg.sender, s.host, share), "Transfer failed");
 
         emit SplitMemberPaid(_id, msg.sender, share);
+    }
+
+    /// @notice Marks a split as completed. Only the host can call this.
+    /// @dev Guards against paying into a completed split; the split is settled
+    ///      after all participants have paid their shares.
+    function completeSplit(uint256 _id) external {
+        SplitBill storage s = splits[_id];
+        require(msg.sender == s.host, "Not the host");
+        require(!s.completed, "Already completed");
+
+        s.completed = true;
     }
 }
