@@ -341,5 +341,8 @@
   "nav.faqDesc": "Pertanyaan umum",
   "nav.openMenu": "Buka menu",
   "nav.closeMenu": "Tutup menu",
-  "merchant.refreshRate": "Muat ulang kurs"
+  "merchant.refreshRate": "Muat ulang kurs",
+  "footer.merchant": "Merchant POS",
+  "footer.splitbill": "Split Bill",
+  "footer.notascore": "Nota Score"
 }
