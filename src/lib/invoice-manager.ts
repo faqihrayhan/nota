@@ -1,8 +1,10 @@
 // NotaInvoiceManager (UUPS proxy) on Arc Testnet.
-// Deployed via contracts/script/Deploy.s.sol — address set after real deployment.
-// Fill INVOICE_MANAGER_ADDRESS with the proxy address from `forge script ... --broadcast`.
+// Deployed 2026-08-12 via contracts/script/Deploy.s.sol.
+// Proxy: 0x7a6645d96c6644c9c4c0601c9b0df05358559c1c
+// Implementation: 0xcf8d51413726739076b6b1aa513413721c581694
+// Explorer: https://testnet.arcscan.app/address/0x7a6645d96c6644c9c4c0601c9b0df05358559c1c
 
-export const INVOICE_MANAGER_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const INVOICE_MANAGER_ADDRESS: string = "0x7a6645d96c6644c9c4c0601c9b0df05358559c1c";
 
 // Minimal ABI (function signatures only — we encode calldata by hand).
 // createAndPayInvoice(address,uint256,bytes32) — one-shot create + pay.
