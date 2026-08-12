@@ -347,5 +347,6 @@
   "merchant.refreshRate": "Refresh rate",
   "hero.verified": "Verified On-Chain",
   "hero.instantSettlement": "Instant Settlement",
-  "hero.receiptAlt": "Nota Receipt Hero"
+  "hero.receiptAlt": "Nota Receipt Hero",
+  "payment.error.contractNotDeployed": "Contract not deployed yet. Please try again later."
 }

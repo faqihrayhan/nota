@@ -69,6 +69,38 @@ contract NotaInvoiceManagerTest is Test {
         assertEq(usdc.balanceOf(payee), amount);
     }
 
+    function testCreateAndPayInvoice_OneShot() public {
+        bytes32 dataHash = keccak256("invoice_metadata_oneshot");
+        uint256 amount = 25 * 10**18;
+
+        // Payer approves, then pays in one transaction (creates invoice + pays)
+        vm.startPrank(payer);
+        usdc.approve(address(manager), amount);
+        uint256 invoiceId = manager.createAndPayInvoice(payee, amount, dataHash);
+        vm.stopPrank();
+
+        assertEq(invoiceId, 1);
+        (, , , bytes32 dh, bool paid) = manager.invoices(1);
+        assertEq(dh, dataHash);
+        assertTrue(paid);
+        assertEq(usdc.balanceOf(payee), amount);
+    }
+
+    function testCreateAndPayInvoice_Reverts_NoPayee() public {
+        vm.startPrank(payer);
+        usdc.approve(address(manager), 10 * 10**18);
+        vm.expectRevert("Invalid payee");
+        manager.createAndPayInvoice(address(0), 10 * 10**18, bytes32(0));
+        vm.stopPrank();
+    }
+
+    function testCreateAndPayInvoice_Reverts_ZeroAmount() public {
+        vm.startPrank(payer);
+        vm.expectRevert("Amount must be > 0");
+        manager.createAndPayInvoice(payee, 0, bytes32(0));
+        vm.stopPrank();
+    }
+
     function testCreateAndPaySplitBill() public {
         bytes32 dataHash = keccak256("split_metadata_456");
         uint256 totalAmount = 100 * 10**18;

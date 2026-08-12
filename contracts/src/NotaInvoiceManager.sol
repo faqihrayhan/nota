@@ -72,6 +72,28 @@ contract NotaInvoiceManager is Initializable, OwnableUpgradeable {
         emit InvoicePaid(_id, msg.sender, inv.amount);
     }
 
+    /// @notice One-shot: creates an invoice for _payee and pays it immediately.
+    /// @dev Caller is the payer. Mirrors the Nota QR flow: scan -> pay.
+    function createAndPayInvoice(address _payee, uint256 _amount, bytes32 _dataHash) external returns (uint256) {
+        require(_payee != address(0), "Invalid payee");
+        require(_amount > 0, "Amount must be > 0");
+
+        uint256 id = ++invoiceCount;
+        invoices[id] = Invoice({
+            payer: msg.sender,
+            payee: _payee,
+            amount: _amount,
+            dataHash: _dataHash,
+            paid: true
+        });
+
+        emit InvoiceCreated(id, msg.sender, _payee, _amount, _dataHash);
+        require(usdc.transferFrom(msg.sender, _payee, _amount), "Transfer failed");
+        emit InvoicePaid(id, msg.sender, _amount);
+
+        return id;
+    }
+
     function createSplit(uint256 _totalAmount, address[] calldata _participants, uint256[] calldata _shares, bytes32 _dataHash) external returns (uint256) {
         require(_participants.length == _shares.length, "Mismatched arrays");
         

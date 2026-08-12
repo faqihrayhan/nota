@@ -347,5 +347,6 @@
   "footer.notascore": "Nota Score",
   "hero.verified": "Terverifikasi On-Chain",
   "hero.instantSettlement": "Settlement Instan",
-  "hero.receiptAlt": "Nota Receipt Hero"
+  "hero.receiptAlt": "Nota Receipt Hero",
+  "payment.error.contractNotDeployed": "Kontrak belum di-deploy. Coba lagi nanti."
 }
