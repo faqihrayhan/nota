@@ -203,9 +203,8 @@ console.error("Failed to load cart:", err);
   // Cart calculations — harga asli disimpan dalam USDC, IDR adalah turunan.
   const cartTotalUSDC = cart.reduce((sum, item) => sum + item.price_usdc * item.qty, 0);
   const cartTotalCurrent = convertFromUsdc(cartTotalUSDC, currencyMode, allRates);
-  const cartTotalIDR = usdcToIdr(cartTotalUSDC, rate.idrPerUsdc);
-  const formattedTotal =
-    currencyMode === "IDR" ? formatIDR(cartTotalIDR) : formatUSDC(cartTotalUSDC);
+  // Total display — selalu tampilkan dalam currency aktif, USDC sebagai acuan.
+  const formattedTotal = formatCurrency(convertFromUsdc(cartTotalUSDC, currencyMode, allRates), currencyMode);
 
   const toggleCurrency = () => {
     setCurrencyMode((m) => (m === "IDR" ? "USDC" : "IDR"));
