@@ -12,8 +12,23 @@ import {
   Share2, 
   CheckCircle2, 
   AlertCircle,
-  QrCode
+  QrCode,
+  Copy,
+  X
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+
+function generateNonce() {
+  return Math.random().toString(36).substring(2, 15);
+}
+
+function encodeQR(data: Record<string, unknown>): string {
+  try {
+    return btoa(JSON.stringify(data));
+  } catch {
+    return "";
+  }
+}
 
 interface Participant {
   id: string;
@@ -55,15 +70,42 @@ export function SplitBillPage() {
 
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [qrData, setQrData] = useState<string | null>(null);
+  const [qrTotal, setQrTotal] = useState(0);
+  const [qrNonce, setQrNonce] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const handleCreateSplit = async () => {
     if (!address || !totalAmount) return;
+    const total = parseFloat(totalAmount) || 0;
+    if (total <= 0) return;
+    const splitItemName = `Split Bill (${participants.filter((p) => p.name.trim()).length} people)`;
+
+    // Build QR payload compatible with PaymentPage scanner (decodeQR).
+    const nonce = generateNonce();
+    const qrPayload = {
+      payerAddress: address,
+      totalAmount: (total * 1_000_000).toFixed(0),
+      items: participants
+        .filter((p) => p.amount > 0)
+        .map((p) => ({ name: p.name.trim() || "Participant", price: p.amount })),
+      category: "split",
+      timestamp: Date.now(),
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      nonce,
+    };
+
+    const encoded = encodeQR(qrPayload);
+    setQrData(encoded);
+    setQrTotal(total);
+    setQrNonce(nonce);
+    setCopied(false);
     setLoading(true);
     setSuccessMsg("");
     try {
       // Simulate on-chain split creation or Supabase logging
-      await new Promise((r) => setTimeout(r, 1200));
-      setSuccessMsg("Split bill request created successfully on-chain!");
+      await new Promise((r) => setTimeout(r, 800));
+      setSuccessMsg("Split bill QR ready — share it with your group!");
     } catch {
       setSuccessMsg("Failed to create split request.");
     } finally {
@@ -161,6 +203,51 @@ export function SplitBillPage() {
           )}
         </div>
       </div>
+
+      {/* Split QR Modal — share with group */}
+      {qrData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-accent/40 bg-ink p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-accent">
+                <QrCode className="h-5 w-5" />
+                <span className="font-display text-lg font-semibold">Split Bill QR</span>
+              </div>
+              <button
+                onClick={() => setQrData(null)}
+                className="rounded-xl p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex justify-center mb-4">
+              <div className="rounded-xl bg-white p-4 shadow-inner">
+                <QRCodeSVG value={qrData} size={220} />
+              </div>
+            </div>
+
+            <div className="text-center mb-4">
+              <p className="text-2xl font-bold text-primary">{qrTotal.toFixed(2)} USDC</p>
+              <p className="text-sm text-text-muted mt-1">
+                {participants.filter((p) => p.amount > 0).length} participants · expires in 10 min
+              </p>
+            </div>
+
+            <button
+              onClick={() => { navigator.clipboard.writeText(qrData); setCopied(true); }}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted hover:bg-ink-2 hover:text-text mb-3"
+            >
+              <Copy className="h-4 w-4" />
+              {copied ? "Copied!" : "Copy QR data"}
+            </button>
+
+            <p className="text-center text-[11px] text-text-faint">
+              Scan with Nota Payment to settle your share on-chain.
+            </p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

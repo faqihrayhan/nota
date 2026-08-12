@@ -289,6 +289,20 @@ export async function saveTransaction(tx: Omit<Transaction, "id" | "created_at">
   return data;
 }
 
+export async function getIncomingTransactions(
+  payeeAddress: string,
+  limit = 50
+): Promise<Transaction[]> {
+  const { data, error } = await getAuthedClient()
+    .from("transactions")
+    .select("*")
+    .eq("payee_address", payeeAddress.toLowerCase())
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
 export async function findTransactionByNonce(
   nonce: string
 ): Promise<Transaction | null> {
