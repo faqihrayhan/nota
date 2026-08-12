@@ -13,22 +13,22 @@ import {
   updateCartItemQty,
   removeFromCart,
   clearCart,
-  saveTransaction,
   getTransactions,
+  getIncomingTransactions,
+  subscribeToTransactions,
   type CatalogItem,
   type CartItem,
   type Transaction,
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
-import {
+import {  
   fetchExchangeRate,
   getCachedRate,
   idrToUsdc,
   usdcToIdr,
   formatIDR,
   formatUSDC,
-  type ExchangeRate,
-} from "@/lib/exchange-rate";
+  type ExchangeRate, type CurrencyCode, CURRENCY_SYMBOLS, fetchLiveRates, convertFromUsdc, convertToUsdc, formatCurrency } from "@/lib/exchange-rate";
 import { cn } from "@/lib/utils";
 import {
   Plus,
@@ -67,17 +67,21 @@ export default function MerchantPage() {
   const { t } = useLanguage();
 
   // UI State
-  const [currencyMode, setCurrencyMode] = useState<"IDR" | "USDC">("IDR");
+  const [currencyMode, setCurrencyMode] = useState<CurrencyCode>("USDC");
 
   // Catalog state
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
+  const [newItemStock, setNewItemStock] = useState("");
+  const [newItemBatch, setNewItemBatch] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editStock, setEditStock] = useState("");
+  const [editBatch, setEditBatch] = useState("");
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -87,15 +91,18 @@ export default function MerchantPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [qrTotal, setQrTotal] = useState(0);
   const [qrNonce, setQrNonce] = useState("");
-  const [successTx, setSuccessTx] = useState<Transaction | null>(null);
   const [error, setError] = useState("");
 
   // History state
   const [history, setHistory] = useState<Transaction[]>([]);
+  // Incoming payments (payee = me) — only NEW payments via realtime (not history)
+  const [incoming, setIncoming] = useState<Transaction[]>([]);
 
   // Live IDR⇄USDC rate (fetched from CoinGecko; falls back offline)
   const [rate, setRate] = useState<ExchangeRate>(() => getCachedRate());
   const [refreshingRate, setRefreshingRate] = useState(false);
+  const [allRates, setAllRates] = useState<Record<string, number>>({});
+  const [rateSource, setRateSource] = useState<"coingecko" | "fallback">(() => getCachedRate().source as "coingecko" | "fallback");
 
   // Load data on wallet connect
   useEffect(() => {
@@ -103,13 +110,25 @@ export default function MerchantPage() {
     loadCatalog();
     loadCart();
     loadHistory();
+    // NOTE: loadIncoming() is intentionally NOT called on mount — the banner
+    // shows only NEW payments arriving via realtime, not historical ones.
+    const unsub = subscribeToTransactions(() => {
+      loadHistory();
+      loadIncoming();
+    });
+    return () => unsub();
   }, [address]);
 
   // Refresh the exchange rate on mount
   useEffect(() => {
     let active = true;
-    fetchExchangeRate().then((r) => {
-      if (active) setRate(r);
+    fetchExchangeRate().then(async (r) => {
+      if (active) {
+        setRate(r);
+        const lRates = await fetchLiveRates();
+        setAllRates(lRates.rates);
+        setRateSource(lRates.source);
+      }
     });
     return () => {
       active = false;
@@ -125,6 +144,9 @@ export default function MerchantPage() {
     try {
       const fresh = await fetchExchangeRate();
       setRate(fresh);
+      const lRates = await fetchLiveRates();
+      setAllRates(lRates.rates);
+      setRateSource(lRates.source);
     } catch {
       // fetchExchangeRate never throws (falls back to default), keep old rate
     } finally {
@@ -169,27 +191,43 @@ console.error("Failed to load cart:", err);
     }
   }
 
+  async function loadIncoming() {
+    if (!address) return;
+    try {
+      const txs = await getIncomingTransactions(address);
+      setIncoming(txs);
+    } catch (err) {
+      console.error("Failed to load incoming payments:", err);
+    }
+  }
+
   // Cart calculations — harga asli disimpan dalam USDC, IDR adalah turunan.
   const cartTotalUSDC = cart.reduce((sum, item) => sum + item.price_usdc * item.qty, 0);
-  const cartTotalIDR = usdcToIdr(cartTotalUSDC, rate.idrPerUsdc);
-  const formattedTotal =
-    currencyMode === "IDR" ? formatIDR(cartTotalIDR) : formatUSDC(cartTotalUSDC);
+  const cartTotalCurrent = convertFromUsdc(cartTotalUSDC, currencyMode, allRates);
+  // Total display — selalu tampilkan dalam currency aktif, USDC sebagai acuan.
+  const formattedTotal = formatCurrency(convertFromUsdc(cartTotalUSDC, currencyMode, allRates), currencyMode);
 
   const toggleCurrency = () => {
     setCurrencyMode((m) => (m === "IDR" ? "USDC" : "IDR"));
   };
 
   // Add item to catalog
-  async function handleAddToCatalog(e: React.FormEvent) {
+  async function handleAddToCatalog(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!address || !newItemName.trim() || !newItemPrice.trim()) return;
     const priceNum = parseFloat(newItemPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
-    const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
+    const priceUsdc = currencyMode === "USDC" ? priceNum : convertToUsdc(priceNum, currencyMode, allRates);
+    const stockNum = newItemStock ? parseFloat(newItemStock) : 0;
     try {
-      await addCatalogItem(address, newItemName.trim(), priceUsdc);
+      await addCatalogItem(address, newItemName.trim(), priceUsdc, {
+        stock: stockNum,
+        batch_no: newItemBatch.trim() || undefined,
+      });
       setNewItemName("");
       setNewItemPrice("");
+      setNewItemStock("");
+      setNewItemBatch("");
       setIsAdding(false);
       await loadCatalog();
     } catch (err) {
@@ -205,6 +243,8 @@ console.error("Failed to load cart:", err);
     setEditPrice(currencyMode === "IDR"
       ? Math.round(usdcToIdr(item.price_usdc, rate.idrPerUsdc)).toString()
       : item.price_usdc.toString());
+    setEditStock(item.stock != null ? item.stock.toString() : "");
+    setEditBatch(item.batch_no || "");
     setIsAdding(false);
   }
 
@@ -212,16 +252,22 @@ console.error("Failed to load cart:", err);
     setEditingItem(null);
     setEditName("");
     setEditPrice("");
+    setEditStock("");
+    setEditBatch("");
   }
 
-  async function handleSaveEdit(e: React.FormEvent) {
+  async function handleSaveEdit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!address || !editingItem || !editName.trim() || !editPrice.trim()) return;
     const priceNum = parseFloat(editPrice.replace(/[^0-9.]/g, ""));
     if (isNaN(priceNum) || priceNum <= 0) return;
-    const priceUsdc = currencyMode === "IDR" ? idrToUsdc(priceNum, rate.idrPerUsdc) : priceNum;
+    const priceUsdc = currencyMode === "USDC" ? priceNum : convertToUsdc(priceNum, currencyMode, allRates);
+    const stockNum = editStock ? parseFloat(editStock) : 0;
     try {
-      await updateCatalogItem(editingItem.id, editName.trim(), priceUsdc);
+      await updateCatalogItem(editingItem.id, editName.trim(), priceUsdc, {
+        stock: stockNum,
+        batch_no: editBatch.trim() || undefined,
+      });
       cancelEditItem();
       await loadCatalog();
     } catch (err) {
@@ -275,7 +321,7 @@ console.error("Failed to load cart:", err);
   function handleGenerateQR() {
     if (cart.length === 0) return;
     const nonce = generateNonce();
-    const totalUsdc = cartTotalUSDC.toFixed(6);
+    const totalUsdcVal = cartTotalUSDC;
     const itemsForQR = cart.map((item) => ({
       name: item.item_name,
       price: item.price_usdc,
@@ -283,7 +329,7 @@ console.error("Failed to load cart:", err);
 
     const qrPayload = {
       payerAddress: address,
-      totalAmount: (parseFloat(totalUsdc) * 1_000_000).toFixed(0),
+      totalAmount: (totalUsdcVal * 1_000_000).toFixed(0),
       items: itemsForQR,
       category: "belanja",
       timestamp: Date.now(),
@@ -294,37 +340,8 @@ console.error("Failed to load cart:", err);
     const encoded = encodeQR(qrPayload);
     setQrData(encoded);
     setQrNonce(nonce);
+    setQrTotal(totalUsdcVal);
     setError("");
-  }
-
-  // Simulate payment received (for testing)
-  async function handleSimulatePayment() {
-    if (!address || !qrData) return;
-    try {
-      const tx: Omit<Transaction, "id" | "created_at"> = {
-        wallet_address: address.toLowerCase(),
-        payer_address: address.toLowerCase(),
-        payee_address: address.toLowerCase(),
-        amount: qrTotal,
-        category: "belanja",
-        items: cart.map((c) => ({ name: c.item_name, price: c.price_usdc })),
-        tx_hash: `0xsimulated${Date.now()}`,
-        block_hash: `0xsimulated${Date.now()}`,
-        block_number: 0,
-        status: "confirmed",
-        mode: "receive",
-        nonce: qrNonce,
-      };
-      await saveTransaction(tx);
-      setSuccessTx(tx as Transaction);
-      setQrData(null);
-      await clearCart(address);
-      await loadCart();
-      await loadHistory();
-    } catch (err) {
-      setError(t("merchant.failedToRecordTx"));
-      console.error(err);
-    }
   }
 
   if (!address) {
@@ -372,6 +389,21 @@ console.error("Failed to load cart:", err);
             )}
           </div>
 
+        {/* Incoming payment banner (auto-detected) */}
+        {incoming.length > 0 && (
+          <div className="mb-6 flex items-center gap-3 rounded-xl border border-stamp-green/30 bg-stamp-green/5 px-4 py-3 text-sm">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-stamp-green opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-stamp-green" />
+            </span>
+            <span className="text-stamp-green">
+              <span className="font-semibold">{t("merchant.newPaymentDetected")}</span>{" "}
+              {incoming.length} {incoming.length > 1 ? t("merchant.paymentsReceived") : t("merchant.paymentReceived")} —{" "}
+              {formatUSDC(incoming.reduce((s, tx) => s + tx.amount, 0))} USDC
+            </span>
+          </div>
+        )}
+
           {error && (
             <div className="mb-6 flex items-center gap-2 rounded-xl border border-warn-amber/40 bg-warn-amber/10 px-4 py-3 text-sm text-warn-amber">
               <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -398,7 +430,7 @@ console.error("Failed to load cart:", err);
 
               {/* Add item form */}
               {isAdding && (
-                <form onSubmit={handleAddToCatalog} className="rounded-2xl border border-primary/30 bg-ink-2/50 p-4">
+                <form onSubmit={handleAddToCatalog} className="rounded-2xl border border-primary/30 bg-ink-2/50 p-4 space-y-3">
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <input
                       type="text"
@@ -407,21 +439,39 @@ console.error("Failed to load cart:", err);
                       placeholder={t("merchant.itemName")}
                       className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
                     />
-<div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
-                        {currencyMode === "IDR" ? "Rp" : "$"}
+                    <div className="flex rounded-xl border border-ink-line/40 bg-ink overflow-hidden focus-within:border-primary sm:w-40">
+                      <span className="flex items-center bg-ink-2/80 px-3 text-xs font-semibold text-text-muted border-r border-ink-line/30 select-none">
+                        {CURRENCY_SYMBOLS[currencyMode].trim()}
                       </span>
                       <input
                         type="text"
                         value={newItemPrice}
                         onChange={(e) => setNewItemPrice(e.target.value)}
-                        placeholder={currencyMode === "IDR" ? "25.000" : "1.50"}
-                        className="w-full rounded-xl border border-ink-line/40 bg-ink pl-10 pr-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-32"
+                        placeholder={currencyMode === "USDC" ? "1.50" : "25.000"}
+                        className="w-full bg-transparent px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none"
                       />
                     </div>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      type="number"
+                      value={newItemStock}
+                      onChange={(e) => setNewItemStock(e.target.value)}
+                      placeholder="Stok (e.g. 100)"
+                      className="w-full rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-1/2"
+                    />
+                    <input
+                      type="text"
+                      value={newItemBatch}
+                      onChange={(e) => setNewItemBatch(e.target.value)}
+                      placeholder="No. Batch / SKU (Opsional)"
+                      className="w-full rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-1/2"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-1">
                     <button
                       type="submit"
-                      className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
+                      className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
                     >
                       {t("merchant.add")}
                     </button>
@@ -457,18 +507,18 @@ console.error("Failed to load cart:", err);
                             placeholder={t("merchant.itemName")}
                             className="flex-1 rounded-xl border border-ink-line/40 bg-ink px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
                           />
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
-                              {currencyMode === "IDR" ? "Rp" : "$"}
-                            </span>
-                            <input
-                              type="text"
-                              value={editPrice}
-                              onChange={(e) => setEditPrice(e.target.value)}
-                              placeholder={currencyMode === "IDR" ? "25.000" : "1.50"}
-                              className="w-full rounded-xl border border-ink-line/40 bg-ink pl-10 pr-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none sm:w-32"
-                            />
-                          </div>
+                          <div className="flex rounded-xl border border-ink-line/40 bg-ink overflow-hidden focus-within:border-primary sm:w-40">
+                      <span className="flex items-center bg-ink-2/80 px-3 text-xs font-semibold text-text-muted border-r border-ink-line/30 select-none">
+                        {CURRENCY_SYMBOLS[currencyMode].trim()}
+                      </span>
+                      <input
+                        type="text"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder={currencyMode === "USDC" ? "1.50" : "25.000"}
+                        className="w-full bg-transparent px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none"
+                      />
+                    </div>
                           <button
                             type="submit"
                             className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-primary-strong"
@@ -490,10 +540,27 @@ console.error("Failed to load cart:", err);
                       className="group flex items-center justify-between rounded-2xl border border-ink-line/30 bg-ink-2/20 p-4 transition-all hover:border-ink-line/60 hover:bg-ink-2/40"
                     >
                       <div>
-                        <p className="font-medium text-text">{item.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-text">{item.name}</p>
+                          {item.stock != null && item.stock > 0 && (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                              Stok: {item.stock}
+                            </span>
+                          )}
+                          {item.batch_no && (
+                            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                              Batch: {item.batch_no}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-text-muted">
                           {formatUSDC(item.price_usdc)}
-                          {currencyMode === "IDR" && ` ≈ ${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))}`}
+                          {currencyMode !== "USDC" && (
+                            <span>
+                              {" ≈ "}
+                              {formatCurrency(convertFromUsdc(item.price_usdc, currencyMode, allRates), currencyMode)}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="flex gap-2 md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
@@ -536,13 +603,22 @@ console.error("Failed to load cart:", err);
                   <ShoppingCart className="h-5 w-5 text-primary" />
                   <h2 className="font-display text-lg font-semibold">{t("merchant.cart")}</h2>
                 </div>
-                <button
-                  onClick={toggleCurrency}
-className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40 px-3 py-1.5 text-xs font-medium text-text-muted transition-all hover:bg-ink-2 hover:text-text"
-                >
-                  <RefreshCcw className="h-3 w-3" />
-                  {t("merchant.show")} {currencyMode === "IDR" ? "USDC" : "IDR"}
-                </button>
+                <div className="inline-flex items-center rounded-xl border border-ink-line/40 bg-ink-2/60 p-1">
+                  {(["USDC", "IDR", "MYR", "SGD"] as const).map((curr) => (
+                    <button
+                      key={curr}
+                      onClick={() => setCurrencyMode(curr)}
+                      className={cn(
+                        "rounded-lg px-2.5 py-1 text-xs font-medium transition-all",
+                        currencyMode === curr
+                          ? "bg-accent text-white shadow-sm font-semibold"
+                          : "text-text-muted hover:text-text hover:bg-white/5"
+                      )}
+                    >
+                      {curr === "USDC" ? "🇺🇸 USDC" : curr === "IDR" ? "🇮🇩 IDR" : curr === "MYR" ? "🇲🇾 MYR" : "🇸🇬 SGD"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className={cn("rounded-2xl border transition-all", cart.length === 0 ? "border-ink-line/30 bg-ink-2/20" : "border-primary/30 bg-primary/5")}> 
@@ -573,9 +649,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                           <div className="flex-1">
                             <p className="font-medium text-text">{item.item_name}</p>
                             <p className="text-sm text-text-muted">
-                              {currencyMode === "IDR"
-                                ? `${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))} × ${item.qty}`
-                                : `${formatUSDC(item.price_usdc)} × ${item.qty}`}
+                              {`${formatCurrency(convertFromUsdc(item.price_usdc, currencyMode, allRates), currencyMode)} × ${item.qty}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
@@ -609,26 +683,26 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                     <div className="border-t border-ink-line/30 p-4">
                       <div className="flex justify-between text-sm mb-2">
 <span className="text-text-muted">{t("merchant.subtotal")}</span>
-                        <span>{formatIDR(cartTotalIDR)}</span>
+                        <span>{formatCurrency(convertFromUsdc(cartTotalUSDC, currencyMode, allRates), currencyMode)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold">{t("merchant.total")}</span>
                         <span className="font-bold text-primary">{formattedTotal}</span>
                       </div>
-                      {currencyMode === "IDR" && (
+                      {currencyMode !== "USDC" && (
                         <div className="mt-1 text-right text-xs text-text-muted">
                           ≈ {formatUSDC(cartTotalUSDC)}
                         </div>
                       )}
                       <div className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-text-muted/60">
                         <span>
-                          1 USDC ≈ {formatIDR(Math.round(rate.idrPerUsdc))}
-                          {rate.source === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
+                          1 USDC ≈ {formatIDR(Math.round((allRates.IDR || rate.idrPerUsdc)))}
+                          {rateSource === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
                         </span>
                         <button
                           onClick={handleRefreshRate}
                           disabled={refreshingRate}
-                          title="Refresh rate"
+                          title={t("merchant.refreshRate")}
                           className="rounded-md p-1 text-text-muted/60 transition-colors hover:bg-ink-line/40 hover:text-text disabled:opacity-50"
                         >
                           <RefreshCcw className={cn("h-3 w-3", refreshingRate && "animate-spin")} />
@@ -678,7 +752,7 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
 
               <div className="text-center mb-4">
                 <p className="text-2xl font-bold text-primary">{formattedTotal}</p>
-                {currencyMode === "IDR" && (
+                {currencyMode !== "USDC" && (
                   <p className="text-sm text-text-muted">≈ {formatUSDC(cartTotalUSDC)}</p>
                 )}
               </div>
@@ -691,43 +765,16 @@ className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40
                 {t("merchant.copyQR")}
               </button>
 
-              {/* Testing: simulate payment */}
-              <div className="border-t border-ink-line/30 pt-4">
-                <p className="text-xs text-text-muted text-center mb-2">{t("merchant.forTesting")}</p>
-                <button
-                  onClick={handleSimulatePayment}
-                  className="w-full rounded-xl bg-stamp-green/10 px-4 py-2 text-sm font-medium text-stamp-green hover:bg-stamp-green/20 transition-all"
-                >
-                  {t("merchant.simulatePayment")}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Success Modal */}
-        {successTx && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-stamp-green/40 bg-ink p-8 text-center shadow-2xl">
-<CheckCircle2 className="mx-auto h-12 w-12 text-stamp-green mb-4" />
-              <h3 className="font-display text-xl font-semibold">{t("merchant.paymentReceived")}</h3>
-              <p className="mt-2 text-text-muted">
-                {formatUSDC(successTx.amount)} {t("merchant.receivedSuccessfully")}
-              </p>
-              <a
-                href={`${ARC_EXPLORER_URL}/tx/${successTx.tx_hash}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                {t("merchant.viewOnExplorer")} <ExternalLink className="h-3 w-3" />
-              </a>
-              <button
-                onClick={() => setSuccessTx(null)}
-                className="mt-6 w-full rounded-xl border border-ink-line/40 px-4 py-3 text-sm font-medium text-text-muted hover:bg-ink-2 hover:text-text transition-all"
-              >
-                {t("merchant.done")}
-              </button>
+              {/* Auto-detect status */}
+              {incoming.length > 0 && (
+                <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-stamp-green/30 bg-stamp-green/5 px-4 py-2.5 text-xs text-stamp-green">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-stamp-green opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-stamp-green" />
+                  </span>
+                  {t("merchant.realtimeActive")} · {incoming.length} {t("merchant.paymentsReceived")}
+                </div>
+              )}
             </div>
           </div>
         )}

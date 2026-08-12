@@ -329,6 +329,26 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         method: "eth_chainId",
       })) as string;
 
+      // Add listeners for other wallets too
+      p.on?.("accountsChanged", (accs: unknown) => {
+        const list = accs as string[];
+        if (list.length === 0) {
+          setState({
+            address: null,
+            chainIdHex: null,
+            walletId: null,
+            status: "idle",
+            error: null,
+          });
+          window.localStorage.removeItem(STORAGE_KEY);
+        } else {
+          setState((s) => ({ ...s, address: list[0] ?? null }));
+        }
+      });
+      p.on?.("chainChanged", (cId: unknown) => {
+        setState((s) => ({ ...s, chainIdHex: cId as string }));
+      });
+
       setState({
         address: accounts[0] ?? null,
         chainIdHex,

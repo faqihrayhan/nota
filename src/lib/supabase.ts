@@ -77,6 +77,10 @@ export type CatalogItem = {
   wallet_address: string;
   name: string;
   price_usdc: number;
+  sku?: string;
+  stock?: number;
+  batch_no?: string;
+  attributes?: Record<string, any>;
   created_at: string;
   updated_at: string;
 };
@@ -87,6 +91,9 @@ export type CartItem = {
   item_name: string;
   qty: number;
   price_usdc: number;
+  catalog_id?: string;
+  batch_no?: string;
+  attributes?: Record<string, any>;
   added_at: string;
 };
 
@@ -105,7 +112,8 @@ export async function getCatalog(walletAddress: string): Promise<CatalogItem[]> 
 export async function addCatalogItem(
   walletAddress: string,
   name: string,
-  priceUsdc: number
+  priceUsdc: number,
+  options?: { sku?: string; stock?: number; batch_no?: string; attributes?: Record<string, any> }
 ): Promise<CatalogItem> {
   const { data, error } = await getAuthedClient()
     .from("merchant_catalog")
@@ -113,6 +121,10 @@ export async function addCatalogItem(
       wallet_address: walletAddress.toLowerCase(),
       name,
       price_usdc: priceUsdc,
+      sku: options?.sku,
+      stock: options?.stock ?? 0,
+      batch_no: options?.batch_no,
+      attributes: options?.attributes || {},
     })
     .select()
     .single();
@@ -123,11 +135,20 @@ export async function addCatalogItem(
 export async function updateCatalogItem(
   id: string,
   name: string,
-  priceUsdc: number
+  priceUsdc: number,
+  options?: { sku?: string; stock?: number; batch_no?: string; attributes?: Record<string, any> }
 ): Promise<void> {
   const { error } = await getAuthedClient()
     .from("merchant_catalog")
-    .update({ name, price_usdc: priceUsdc, updated_at: new Date().toISOString() })
+    .update({
+      name,
+      price_usdc: priceUsdc,
+      sku: options?.sku,
+      stock: options?.stock,
+      batch_no: options?.batch_no,
+      attributes: options?.attributes,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id);
   if (error) throw error;
 }
@@ -135,6 +156,32 @@ export async function updateCatalogItem(
 export async function deleteCatalogItem(id: string): Promise<void> {
   const { error } = await getAuthedClient().from("merchant_catalog").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function deductStockAfterPayment(
+  merchantAddress: string,
+  items: { name: string; price: number; qty?: number }[]
+): Promise<void> {
+  const client = getAuthedClient();
+  const normalizedMerchant = merchantAddress.toLowerCase();
+
+  for (const item of items) {
+    const qtyToDed = item.qty || 1;
+    const { data: catalogItem } = await client
+      .from("merchant_catalog")
+      .select("id, stock")
+      .eq("wallet_address", normalizedMerchant)
+      .ilike("name", item.name)
+      .maybeSingle();
+
+    if (catalogItem && catalogItem.stock != null) {
+      const newStock = Math.max(0, Number(catalogItem.stock) - qtyToDed);
+      await client
+        .from("merchant_catalog")
+        .update({ stock: newStock, updated_at: new Date().toISOString() })
+        .eq("id", catalogItem.id);
+    }
+  }
 }
 
 // ─── Cart ────────────────────────────────────────────────────
@@ -240,6 +287,21 @@ export async function saveTransaction(tx: Omit<Transaction, "id" | "created_at">
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function getIncomingTransactions(
+  payeeAddress: string,
+  limit = 50
+): Promise<Transaction[]> {
+  const { data, error } = await getAuthedClient()
+    .from("transactions")
+    .select("*")
+    .eq("payee_address", payeeAddress.toLowerCase())
+    .gt("amount", 0)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
 }
 
 export async function findTransactionByNonce(

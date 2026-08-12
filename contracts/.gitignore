@@ -1,0 +1,6 @@
+# Foundry overrides
+out/
+cache/
+.forge-build/
+.env
+lcov.info
