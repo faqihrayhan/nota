@@ -19,7 +19,7 @@ export const ARC_TESTNET_PARAMS = {
     // balances/amounts is the most common bug when porting a dApp to Arc.
     decimals: 18,
   },
-  rpcUrls: ["https://rpc.testnet.arc.network"],
+  rpcUrls: ["https://rpc.testnet.arc.io"],
   blockExplorerUrls: ["https://testnet.arcscan.app"],
 };
 
