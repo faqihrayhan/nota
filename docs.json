@@ -1,0 +1,36 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Nota on Arc",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.png",
+  "colors": {
+    "primary": "#3b82f6",
+    "light": "#60a5fa",
+    "dark": "#1d4ed8",
+    "background": {
+      "light": "#ffffff",
+      "dark": "#08080a"
+    }
+  },
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": ["introduction", "quickstart"]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": ["verifiable-accounting", "arc-integration"]
+    },
+    {
+      "group": "Smart Contracts",
+      "pages": ["uups-architecture", "data-hash"]
+    }
+  ],
+  "footerSocials": {
+    "x": "https://x.com/notaonarc",
+    "github": "https://github.com/faqihrayhan/nota"
+  }
+}
