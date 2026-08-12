@@ -103,17 +103,17 @@ export function SplitBillPage() {
     <section className="mx-auto max-w-2xl px-5 py-24">
       <div className="mb-12 text-center">
         <h1 className="font-display text-4xl font-bold tracking-tight text-text sm:text-5xl">
-          Split Bill
+          {t("nav.split-bill")}
         </h1>
         <p className="mt-4 text-lg text-text-muted">
-          {t("features.pilar4.desc") || "Bagi tagihan on-chain dengan teman-temanmu."}
+          {t("splitBill.desc")}
         </p>
       </div>
 
       <div className="rounded-3xl border border-ink-line/60 bg-ink-2/50 p-8 backdrop-blur-xl">
         <div className="space-y-6">
           <div>
-            <label className="mb-2 block text-sm font-medium text-text-muted">Total Amount (USDC)</label>
+            <label className="mb-2 block text-sm font-medium text-text-muted">{t("splitBill.totalAmount")}</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-display">$</span>
               <input
@@ -128,12 +128,12 @@ export function SplitBillPage() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-text-muted">Participants</label>
+              <label className="text-sm font-medium text-text-muted">{t("splitBill.participants")}</label>
               <button 
                 onClick={splitEqually}
                 className="text-xs font-medium text-accent hover:underline"
               >
-                Split Equally
+                {t("splitBill.splitEqually")}
               </button>
             </div>
             
@@ -143,7 +143,7 @@ export function SplitBillPage() {
                   type="text"
                   value={p.name}
                   onChange={(e) => updateParticipant(p.id, { name: e.target.value })}
-                  placeholder={idx === 0 ? "You" : `Participant ${idx + 1}`}
+                  placeholder={idx === 0 ? t("splitBill.you") : `${t("splitBill.participant")} ${idx + 1}`}
                   className="flex-1 rounded-xl border border-ink-line/60 bg-ink/50 px-4 py-3 text-sm text-text outline-none focus:border-accent/50"
                 />
                 <div className="relative w-32">
@@ -172,7 +172,7 @@ export function SplitBillPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-ink-line/60 py-4 text-sm font-medium text-text-muted transition-colors hover:border-accent/40 hover:text-accent hover:bg-accent/5"
             >
               <Plus className="h-4 w-4" />
-              Add Participant
+              {t("splitBill.addParticipant")}
             </button>
           </div>
 
@@ -182,7 +182,7 @@ export function SplitBillPage() {
             className="w-full rounded-2xl bg-paper-white py-5 font-display text-lg font-bold text-paper-ink shadow-lg shadow-paper-white/5 transition-all hover:scale-[1.02] hover:shadow-paper-white/10 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
             <QrCode className="h-5 w-5" />
-            Create Split Request
+            {t("splitBill.create")}
           </button>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function SplitBillPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-accent">
                 <QrCode className="h-5 w-5" />
-                <span className="font-display text-lg font-semibold">Split Bill QR</span>
+                <span className="font-display text-lg font-semibold">{t("splitBill.qrTitle")}</span>
               </div>
               <button
                 onClick={() => setQrData(null)}
@@ -213,7 +213,7 @@ export function SplitBillPage() {
             <div className="text-center mb-4">
               <p className="text-2xl font-bold text-primary">{qrTotal.toFixed(2)} USDC</p>
               <p className="text-sm text-text-muted mt-1">
-                {participants.filter((p) => p.amount > 0).length} participants · expires in 10 min
+                {participants.filter((p) => p.amount > 0).length} {t("splitBill.participantsShort")} · {t("splitBill.expiresIn")}
               </p>
             </div>
 
@@ -222,11 +222,11 @@ export function SplitBillPage() {
               className="w-full flex items-center justify-center gap-2 rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted hover:bg-ink-2 hover:text-text mb-3"
             >
               <Copy className="h-4 w-4" />
-              {copied ? "Copied!" : "Copy QR data"}
+              {copied ? t("splitBill.copied") : t("splitBill.copyQr")}
             </button>
 
             <p className="text-center text-[11px] text-text-faint">
-              Scan with Nota Payment to settle your share on-chain.
+              {t("splitBill.scanHint")}
             </p>
           </div>
         </div>

@@ -316,5 +316,19 @@
   "forecast.nextInflow": "Masuk Berikutnya",
   "forecast.projectedInflow": "proyeksi bulan depan",
   "forecast.insightInflow": "Kamu menerima rata-rata",
-  "forecast.insightInflowUp": "proyeksi pemasukan naik"
+  "forecast.insightInflowUp": "proyeksi pemasukan naik",
+  "splitBill.desc": "Bagi tagihan on-chain dengan teman-temanmu.",
+  "splitBill.totalAmount": "Total Jumlah (USDC)",
+  "splitBill.participants": "Peserta",
+  "splitBill.splitEqually": "Bagi Rata",
+  "splitBill.you": "Kamu",
+  "splitBill.participant": "Peserta",
+  "splitBill.addParticipant": "Tambah Peserta",
+  "splitBill.create": "Buat Permintaan Split",
+  "splitBill.qrTitle": "QR Split Bill",
+  "splitBill.participantsShort": "peserta",
+  "splitBill.expiresIn": "kadaluarsa dalam 10 menit",
+  "splitBill.copied": "Tersalin!",
+  "splitBill.copyQr": "Salin data QR",
+  "splitBill.scanHint": "Scan dengan Nota Payment untuk membayar bagianmu on-chain."
 }

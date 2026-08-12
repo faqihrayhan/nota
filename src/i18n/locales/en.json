@@ -319,5 +319,19 @@
   "forecast.nextInflow": "Next Inflow",
   "forecast.projectedInflow": "projected for next month",
   "forecast.insightInflow": "You receive on average",
-  "forecast.insightInflowUp": "projected inflow is up"
+  "forecast.insightInflowUp": "projected inflow is up",
+  "splitBill.desc": "Split bills on-chain with your friends.",
+  "splitBill.totalAmount": "Total Amount (USDC)",
+  "splitBill.participants": "Participants",
+  "splitBill.splitEqually": "Split Equally",
+  "splitBill.you": "You",
+  "splitBill.participant": "Participant",
+  "splitBill.addParticipant": "Add Participant",
+  "splitBill.create": "Create Split Request",
+  "splitBill.qrTitle": "Split Bill QR",
+  "splitBill.participantsShort": "participants",
+  "splitBill.expiresIn": "expires in 10 min",
+  "splitBill.copied": "Copied!",
+  "splitBill.copyQr": "Copy QR data",
+  "splitBill.scanHint": "Scan with Nota Payment to settle your share on-chain."
 }
