@@ -1,8 +1,85 @@
 ---
-title: "UUPS Architecture"
-description: "Upgradeable Smart Contract Architecture"
+title: "UUPS Proxy Architecture"
+description: "Deep dive into Universal Upgradeable Proxy Standard (UUPS) used by Nota smart contracts on Arc Network"
 ---
 
-# UUPS Proxy Architecture
+# Universal Upgradeable Proxy Standard (UUPS)
 
-Our smart contracts use the Universal Upgradeable Proxy Standard (UUPS) to ensure long-term maintainability and security.
+Nota's smart contract ecosystem employs the **Universal Upgradeable Proxy Standard (UUPS)** as defined in [ERC-1822](https://eips.ethereum.org/EIPS/eip-1822) and OpenZeppelin's upgradeable suite. 
+
+This architecture guarantees that merchant balances, receipt registries, and transaction histories remain **immutable in state**, while allowing contract logic to be safely patched or upgraded for future Arc Network features.
+
+---
+
+## 1. Proxy vs Implementation Pattern
+
+```
+  +--------------------------+
+  |      User / Client       |
+  +--------------------------+
+               |
+               | (1) Calls proxy address (e.g. NotaPayment.sol)
+               v
+  +--------------------------+              delegatecall
+  |      Proxy Contract      | -------------------------------------+
+  |  (Holds ERC-1967 State)  |                                      |
+  +--------------------------+                                      v
+  |  storageSlot: implAddr   |                    +----------------------------------+
+  +--------------------------+                    |    Implementation Contract V1    |
+                                                  | (Holds Execution Logic & Code)   |
+                                                  +----------------------------------+
+```
+
+### Key Technical Advantages of UUPS
+1. **Gas Efficiency**: Unlike Transparent Proxy Patterns where upgrade logic resides in the Proxy itself (requiring admin checks on every call), UUPS puts the `upgradeToAndCall` function inside the **Implementation contract**, reducing gas overhead for normal user transactions.
+2. **State Storage Safety**: All contract state variables (merchant records, nonces, admin roles) are stored in the **Proxy contract's storage slots** via **ERC-1967**. Upgrading logic NEVER wipes or alters existing transaction data.
+3. **Emergency Safeguards**: Upgrades require explicit authorization from `DEFAULT_ADMIN_ROLE` or multi-sig signers.
+
+---
+
+## 2. Storage Layout Rules & Collision Prevention
+
+To prevent storage slot collision during contract upgrades, Nota follows OpenZeppelin's strict storage inheritance guidelines:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
+contract NotaPaymentV1 is UUPSUpgradeable, AccessControlUpgradeable {
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
+    // Storage slots MUST remain append-only in future versions (V2, V3...)
+    mapping(bytes32 => bool) public processedDataHashes;
+    mapping(address => uint256) public merchantNonces;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address defaultAdmin) external initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+        _grantRole(UPGRADER_ROLE, defaultAdmin);
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+}
+```
+
+---
+
+## 3. Upgrade Lifecycle & Security Controls
+
+1. **Pre-Deploy Verification**: New implementation contracts are compiled and validated using **Foundry static analysis** and storage layout compatibility checks (`forge inspect storage`).
+2. **Deployment of Implementation V2**: The new implementation contract code is deployed to Arc Testnet/Mainnet.
+3. **UUPS Upgrade Trigger**:
+   ```solidity
+   // Executed by UPGRADER_ROLE via Multi-Sig / Governance
+   proxy.upgradeToAndCall(address(newImplementationV2), "");
+   ```
+4. **Instant Logic Patch**: Subsequent calls to the Proxy execute the new V2 logic immediately while preserving all historical receipt `dataHash` mappings.

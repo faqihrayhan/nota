@@ -1,8 +1,61 @@
 ---
 title: "Data Hash Protocol"
-description: "Data Hash verification on ArcScan"
+description: "Detailed specification of the cryptographic dataHash generation, EVM event emissions, and ArcScan verification in Nota"
 ---
 
-# Data Hash Protocol
+# Data Hash Verification Protocol
 
-Every transaction generates a unique `dataHash` stored on-chain for tamper-proof auditing.
+The `dataHash` is the core cryptographic primitive in Nota. It anchors off-chain commercial transaction data (items, quantities, payment terms) onto the **Arc Network EVM** in an immutable, privacy-preserving manner.
+
+---
+
+## 1. Mathematical Specification
+
+The `dataHash` is calculated using the Ethereum native **Keccak-256** cryptographic hash function over tightly packed canonical parameters:
+
+$$\text{dataHash} = \text{keccak256}(\text{abi.encodePacked}( \text{merchant}, \text{payer}, \text{amountUSDC}, \text{nonce}, \text{timestamp} ))$$
+
+### Parameter Definitions
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `merchant` | `address` | The recipient EVM wallet address receiving USDC settlement |
+| `payer` | `address` | The customer / buyer EVM wallet initiating payment |
+| `amountUSDC` | `uint256` | Settled payment value normalized to 6 decimal places (USDC standard) |
+| `nonce` | `bytes32` | A unique 256-bit entropy value generated per payment request to prevent replay attacks |
+| `timestamp` | `uint256` | Unix epoch timestamp generated during block inclusion on Arc Network |
+
+---
+
+## 2. On-Chain Event Specification
+
+When a settlement transaction completes, the Nota smart contract emits the `ReceiptAnchored` event:
+
+```solidity
+event ReceiptAnchored(
+    bytes32 indexed dataHash,
+    address indexed merchant,
+    address indexed payer,
+    uint256 amountUSDC,
+    uint256 timestamp
+);
+```
+
+### Event Indexing & Query Performance
+- `indexed dataHash`: Allows instant $O(1)$ lookup on **ArcScan** or RPC logs by passing the hash.
+- `indexed merchant`: Enables merchant analytics dashboards to filter all historical income streams directly from Arc EVM events.
+- `indexed payer`: Allows customer wallets to query all verified purchases across their transaction history.
+
+---
+
+## 3. Replay Protection & Security Guarantees
+
+```solidity
+// Replay Protection Check in Smart Contract
+require(!processedDataHashes[dataHash], "Nota: Receipt hash already anchored");
+processedDataHashes[dataHash] = true;
+```
+
+1. **Anti-Replay**: The contract maintains a state mapping `processedDataHashes[bytes32] => bool`. Any attempt to execute or anchor the exact same payment request twice will revert immediately.
+2. **Immutable Timestamping**: The settlement time is locked to Arc's `block.timestamp`, ensuring tamper-proof temporal evidence for financial audits.
+3. **Zero-Knowledge Privacy**: Line-item specifics (e.g. item descriptions or private notes) remain off-chain, ensuring competitors cannot scrape sensitive merchant inventory data from the public blockchain.
