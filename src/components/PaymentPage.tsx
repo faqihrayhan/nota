@@ -102,7 +102,7 @@ function PaymentPageInner() {
 
   // Load transaction history when wallet connects
   useEffect(() => {
-    fetchLiveRates().then(setAllRates);
+    fetchLiveRates().then((r) => setAllRates(r.rates));
     if (!address) return;
     loadHistory();
 const unsub = subscribeToTransactions(() => loadHistory());

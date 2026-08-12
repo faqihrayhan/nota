@@ -102,6 +102,7 @@ export default function MerchantPage() {
   const [rate, setRate] = useState<ExchangeRate>(() => getCachedRate());
   const [refreshingRate, setRefreshingRate] = useState(false);
   const [allRates, setAllRates] = useState<Record<string, number>>({});
+  const [rateSource, setRateSource] = useState<"coingecko" | "fallback">(() => getCachedRate().source as "coingecko" | "fallback");
 
   // Load data on wallet connect
   useEffect(() => {
@@ -124,7 +125,8 @@ export default function MerchantPage() {
       if (active) {
         setRate(r);
         const lRates = await fetchLiveRates();
-        setAllRates(lRates);
+        setAllRates(lRates.rates);
+        setRateSource(lRates.source);
       }
     });
     return () => {
@@ -142,7 +144,8 @@ export default function MerchantPage() {
       const fresh = await fetchExchangeRate();
       setRate(fresh);
       const lRates = await fetchLiveRates();
-      setAllRates(lRates);
+      setAllRates(lRates.rates);
+      setRateSource(lRates.source);
     } catch {
       // fetchExchangeRate never throws (falls back to default), keep old rate
     } finally {
@@ -552,7 +555,12 @@ console.error("Failed to load cart:", err);
                         </div>
                         <p className="text-sm text-text-muted">
                           {formatUSDC(item.price_usdc)}
-                          {currencyMode === "IDR" && ` ≈ ${formatIDR(usdcToIdr(item.price_usdc, rate.idrPerUsdc))}`}
+                          {currencyMode !== "USDC" && (
+                            <span>
+                              {" ≈ "}
+                              {formatCurrency(convertFromUsdc(item.price_usdc, currencyMode, allRates), currencyMode)}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="flex gap-2 md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
@@ -688,8 +696,8 @@ console.error("Failed to load cart:", err);
                       )}
                       <div className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-text-muted/60">
                         <span>
-                          1 USDC ≈ {formatIDR(Math.round(rate.idrPerUsdc))}
-                          {rate.source === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
+                          1 USDC ≈ {formatIDR(Math.round((allRates.IDR || rate.idrPerUsdc)))}
+                          {rateSource === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
                         </span>
                         <button
                           onClick={handleRefreshRate}
