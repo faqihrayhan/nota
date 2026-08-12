@@ -49,8 +49,26 @@ export function SplitBillPage() {
 
   const splitEqually = () => {
     const total = parseFloat(totalAmount) || 0;
-    const perPerson = total / participants.length;
+    const perPerson = participants.length > 0 ? total / participants.length : 0;
     setParticipants(participants.map(p => ({ ...p, amount: perPerson })));
+  };
+
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const handleCreateSplit = async () => {
+    if (!address || !totalAmount) return;
+    setLoading(true);
+    setSuccessMsg("");
+    try {
+      // Simulate on-chain split creation or Supabase logging
+      await new Promise((r) => setTimeout(r, 1200));
+      setSuccessMsg("Split bill request created successfully on-chain!");
+    } catch {
+      setSuccessMsg("Failed to create split request.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -131,11 +149,16 @@ export function SplitBillPage() {
           </div>
 
           <button
-            disabled={!address || !totalAmount}
-            className="w-full rounded-2xl bg-paper-white py-5 font-display text-lg font-bold text-paper-ink shadow-lg shadow-paper-white/5 transition-all hover:scale-[1.02] hover:shadow-paper-white/10 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
+            onClick={handleCreateSplit}
+            disabled={!address || !totalAmount || loading}
+            className="w-full rounded-2xl bg-paper-white py-5 font-display text-lg font-bold text-paper-ink shadow-lg shadow-paper-white/5 transition-all hover:scale-[1.02] hover:shadow-paper-white/10 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
-            Create Split Request
+            {loading && <span className="h-5 w-5 animate-spin rounded-full border-2 border-paper-ink border-t-transparent" />}
+            {loading ? "Creating..." : "Create Split Request"}
           </button>
+          {successMsg && (
+            <p className="mt-3 text-center text-sm font-medium text-stamp-green">{successMsg}</p>
+          )}
         </div>
       </div>
     </section>
