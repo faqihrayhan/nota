@@ -20,7 +20,7 @@ const LanguageContext = createContext<LanguageContextValue | null>(null);
 const STORAGE_KEY = "arc-nota:locale";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("id");
+  const [locale, setLocaleState] = useState<Locale>("en");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY) as Locale | null;
@@ -28,8 +28,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       setLocaleState(saved);
       return;
     }
-    // No saved preference: default to Indonesian regardless of browser
-    // language, since that's this product's primary audience.
+    // Default to English for international & Arc ecosystem audience
   }, []);
 
   const setLocale = useCallback((l: Locale) => {
@@ -38,7 +37,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string) => dictionaries[locale][key] ?? dictionaries.id[key] ?? key,
+    (key: string) => dictionaries[locale][key] ?? dictionaries.en[key] ?? key,
     [locale]
   );
 
