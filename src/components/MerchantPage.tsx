@@ -300,7 +300,7 @@ console.error("Failed to load cart:", err);
   function handleGenerateQR() {
     if (cart.length === 0) return;
     const nonce = generateNonce();
-    const totalUsdc = cartTotalUSDC.toFixed(6);
+    const totalUsdcVal = cartTotalUSDC;
     const itemsForQR = cart.map((item) => ({
       name: item.item_name,
       price: item.price_usdc,
@@ -308,7 +308,7 @@ console.error("Failed to load cart:", err);
 
     const qrPayload = {
       payerAddress: address,
-      totalAmount: (parseFloat(totalUsdc) * 1_000_000).toFixed(0),
+      totalAmount: (totalUsdcVal * 1_000_000).toFixed(0),
       items: itemsForQR,
       category: "belanja",
       timestamp: Date.now(),
@@ -319,6 +319,7 @@ console.error("Failed to load cart:", err);
     const encoded = encodeQR(qrPayload);
     setQrData(encoded);
     setQrNonce(nonce);
+    setQrTotal(totalUsdcVal);
     setError("");
   }
 
