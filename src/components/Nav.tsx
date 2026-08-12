@@ -56,10 +56,10 @@ export function Nav() {
   ];
 
   const docsItems = [
-    { icon: BookOpen, title: t("nav.documentation"), desc: t("nav.documentationDesc"), href: "https://nota.mintlify.app", tag: "Live" },
-    { icon: Code, title: t("nav.apiRef"), desc: t("nav.apiRefDesc"), href: "https://nota.mintlify.app/docs/smart-contracts/uups-architecture" },
-    { icon: FileText, title: t("nav.whitepaper"), desc: t("nav.whitepaperDesc"), href: "https://nota.mintlify.app/docs/core-concepts/verifiable-accounting" },
-    { icon: HelpCircle, title: t("nav.faq"), desc: t("nav.faqDesc"), href: "https://nota.mintlify.app/docs/get-started/quickstart" },
+    { icon: BookOpen, title: t("nav.documentation"), desc: t("nav.documentationDesc"), href: "https://notapay.mintlify.site/docs/get-started/introduction", tag: "Live" },
+    { icon: Code, title: t("nav.apiRef"), desc: t("nav.apiRefDesc"), href: "https://notapay.mintlify.site/docs/smart-contracts/uups-architecture" },
+    { icon: FileText, title: t("nav.whitepaper"), desc: t("nav.whitepaperDesc"), href: "https://notapay.mintlify.site/docs/core-concepts/verifiable-accounting" },
+    { icon: HelpCircle, title: t("nav.faq"), desc: t("nav.faqDesc"), href: "https://notapay.mintlify.site/docs/get-started/quickstart" },
   ];
 
   return (
