@@ -1,15 +1,73 @@
 ---
-title: "Quickstart"
-description: "Get started with Nota in less than 5 minutes"
+title: "Quickstart Guide"
+description: "Step-by-step walkthrough to get started with Nota's features on Arc Network in less than 5 minutes"
 ---
 
 # Quickstart Guide
 
-Learn how to connect your wallet, issue your first receipt, and verify it on ArcScan.
+Welcome to **Nota on Arc**. This guide provides a step-by-step walkthrough for merchants and users to set up their EVM wallet, issue instant USDC payments, generate verifiable receipts, manage split bills, and analyze financial cashflow.
 
-## Steps
+---
 
-1. Connect your Web3 Wallet (MetaMask / Arc compatible).
-2. Create a payment request or merchant QR code.
-3. Complete settlement in USDC.
-4. View your digital receipt and ArcScan verification hash.
+## Prerequisites
+
+Before using Nota, ensure you have:
+1. **An EVM-Compatible Wallet**: MetaMask, Rabby, or WalletConnect-enabled wallet.
+2. **Arc Network RPC Configured**: Arc Testnet / Mainnet RPC added to your wallet.
+3. **Testnet USDC / Arc Gas Tokens**: Small amount of native Arc tokens for gas fees and USDC for settlements.
+
+---
+
+## Step-by-Step Feature Walkthrough
+
+### 1. Connect Wallet & Authenticate (Auth & RLS)
+1. Navigate to [Nota App](https://nota-pay.vercel.app).
+2. Click **Connect Wallet** in the top right corner.
+3. Approve the cryptographic sign-in request in your wallet.
+   - *Nota generates a short-lived, per-wallet Supabase JWT to isolate your merchant catalog and transaction history via Row-Level Security (RLS).*
+
+---
+
+### 2. Merchant Storefront & Catalog Setup (`/merchant`)
+1. Open the **Merchant** menu from the navigation bar.
+2. **Add Products**: Click `+ Add Item` to create items in your catalog (Title, Description, Price in USDC/IDR/SGD/MYR).
+3. **Generate Static/Dynamic QR Code**:
+   - Select catalog items to generate a dynamic merchant payment QR code.
+   - Or click **Display Merchant QR** for a fixed store payment point.
+4. **Live Incoming Order Monitor**: Real-time polling tracks incoming customer payments and auto-verifies on-chain settlement every 2 seconds.
+
+---
+
+### 3. Processing Payments (`/payment`)
+1. Go to the **Payment** section.
+2. Enter the recipient merchant wallet address or scan a **Nota Payment QR Code**.
+3. Choose your preferred display currency (USDC, IDR, MYR, SGD) — values dynamically convert using real-time price feeds while settling on-chain in USDC.
+4. Click **Pay Now** and confirm the transaction in MetaMask.
+5. Once confirmed, Nota detects the transaction receipt (`txReceipt`) on Arc Network and updates the status to **SETTLED**.
+
+---
+
+### 4. Digital Receipt Export & ArcScan Verification
+1. After settlement, a **Digital Receipt Modal** pops up displaying:
+   - Unique Cryptographic `dataHash`.
+   - On-chain Transaction Hash (`txHash`).
+   - Line items, timestamp, and block number.
+2. **Export Options**: Click **Download PDF** or **Save PNG** to store an offline copy of your receipt.
+3. **Verify on ArcScan**: Click **Verify on ArcScan** to inspect the `ReceiptAnchored` event log on the public blockchain explorer.
+
+---
+
+### 5. Split Bill Payments (`/split-bill`)
+1. Navigate to **Split Bill**.
+2. Enter the total bill amount and add participants' wallet addresses/names.
+3. Nota calculates equal or custom itemized splits in USDC.
+4. Share the generated **Split QR / Link** with your group.
+5. Track real-time settlement status as each member pays their portion.
+
+---
+
+### 6. Cashflow Analytics & AI Insights (`/analisa` & `/forecast`)
+1. Open **Analisa** to view your merchant financial dashboard:
+   - **Inflow vs Outflow**: Visual trend charts of total incoming USDC revenue versus outgoing expenses.
+   - **Settlement Velocity**: Average time taken for customer payments to clear on Arc Network.
+2. Open **Forecast** for AI-driven revenue predictions based on historical transaction data on-chain.
