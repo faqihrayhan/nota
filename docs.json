@@ -28,6 +28,7 @@
             "group": "Core Concepts",
             "pages": [
               "docs/core-concepts/verifiable-accounting",
+              "docs/core-concepts/architecture-and-security",
               "docs/core-concepts/arc-integration"
             ]
           },
