@@ -13,28 +13,10 @@ export function Hero() {
 
   return (
     <section id="top" className="relative min-h-[90vh] overflow-hidden flex items-center pt-16 pb-20">
-      {/* Background Animated Gradients */}
+      {/* Background Gradients */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-            x: [0, 50, 0],
-            y: [0, -30, 0]
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-accent/15 blur-[120px]" 
-        />
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.3, 1],
-            opacity: [0.2, 0.4, 0.2],
-            x: [0, -40, 0],
-            y: [0, 40, 0]
-          }}
-          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-          className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-purple-500/10 blur-[120px]" 
-        />
+        <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-accent/10 blur-[100px]" />
+        <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-purple-500/10 blur-[100px]" />
       </div>
 
       <div className="mx-auto max-w-7xl px-6 w-full">
