@@ -13,7 +13,6 @@ import {
   updateCartItemQty,
   removeFromCart,
   clearCart,
-  saveTransaction,
   getTransactions,
   getIncomingTransactions,
   subscribeToTransactions,
@@ -92,7 +91,6 @@ export default function MerchantPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [qrTotal, setQrTotal] = useState(0);
   const [qrNonce, setQrNonce] = useState("");
-  const [successTx, setSuccessTx] = useState<Transaction | null>(null);
   const [error, setError] = useState("");
 
   // History state
@@ -341,36 +339,6 @@ console.error("Failed to load cart:", err);
     setQrNonce(nonce);
     setQrTotal(totalUsdcVal);
     setError("");
-  }
-
-  // Simulate payment received (for testing)
-  async function handleSimulatePayment() {
-    if (!address || !qrData) return;
-    try {
-      const tx: Omit<Transaction, "id" | "created_at"> = {
-        wallet_address: address.toLowerCase(),
-        payer_address: address.toLowerCase(),
-        payee_address: address.toLowerCase(),
-        amount: qrTotal,
-        category: "belanja",
-        items: cart.map((c) => ({ name: c.item_name, price: c.price_usdc })),
-        tx_hash: `0xsimulated${Date.now()}`,
-        block_hash: `0xsimulated${Date.now()}`,
-        block_number: 0,
-        status: "confirmed",
-        mode: "receive",
-        nonce: qrNonce,
-      };
-      await saveTransaction(tx);
-      setSuccessTx(tx as Transaction);
-      setQrData(null);
-      await clearCart(address);
-      await loadCart();
-      await loadHistory();
-    } catch (err) {
-      setError(t("merchant.failedToRecordTx"));
-      console.error(err);
-    }
   }
 
   if (!address) {
@@ -789,17 +757,6 @@ console.error("Failed to load cart:", err);
                 {t("merchant.copyQR")}
               </button>
 
-              {/* Testing: simulate payment */}
-              <div className="border-t border-ink-line/30 pt-4">
-                <p className="text-xs text-text-muted text-center mb-2">{t("merchant.forTesting")}</p>
-                <button
-                  onClick={handleSimulatePayment}
-                  className="w-full rounded-xl bg-stamp-green/10 px-4 py-2 text-sm font-medium text-stamp-green hover:bg-stamp-green/20 transition-all"
-                >
-                  {t("merchant.simulatePayment")}
-                </button>
-              </div>
-
               {/* Auto-detect status */}
               {incoming.length > 0 && (
                 <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-stamp-green/30 bg-stamp-green/5 px-4 py-2.5 text-xs text-stamp-green">
@@ -810,33 +767,6 @@ console.error("Failed to load cart:", err);
                   {t("merchant.realtimeActive")} · {incoming.length} {t("merchant.paymentsReceived")}
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Success Modal */}
-        {successTx && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-stamp-green/40 bg-ink p-8 text-center shadow-2xl">
-<CheckCircle2 className="mx-auto h-12 w-12 text-stamp-green mb-4" />
-              <h3 className="font-display text-xl font-semibold">{t("merchant.paymentReceived")}</h3>
-              <p className="mt-2 text-text-muted">
-                {formatUSDC(successTx.amount)} {t("merchant.receivedSuccessfully")}
-              </p>
-              <a
-                href={`${ARC_EXPLORER_URL}/tx/${successTx.tx_hash}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                {t("merchant.viewOnExplorer")} <ExternalLink className="h-3 w-3" />
-              </a>
-              <button
-                onClick={() => setSuccessTx(null)}
-                className="mt-6 w-full rounded-xl border border-ink-line/40 px-4 py-3 text-sm font-medium text-text-muted hover:bg-ink-2 hover:text-text transition-all"
-              >
-                {t("merchant.done")}
-              </button>
             </div>
           </div>
         )}

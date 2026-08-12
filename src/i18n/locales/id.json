@@ -127,12 +127,7 @@
   "merchant.viewAllTx": "Lihat semua transaksi",
   "merchant.paymentQR": "QR Pembayaran",
   "merchant.copyQR": "Salin data QR",
-  "merchant.forTesting": "Untuk pengujian:",
-  "merchant.simulatePayment": "Simulasi Pembayaran Diterima",
-  "merchant.paymentReceived": "Pembayaran Diterima!",
-  "merchant.receivedSuccessfully": "diterima dengan sukses.",
-  "merchant.viewOnExplorer": "Lihat di explorer",
-  "merchant.done": "Selesai",
+  "merchant.paymentReceived": "pembayaran diterima",
   "merchant.recentTx": "Transaksi Terbaru",
   "merchant.failedToLoadCatalog": "Gagal memuat katalog. Periksa koneksi Supabase.",
   "merchant.failedToAddItem": "Gagal menambahkan item ke katalog",
@@ -310,7 +305,6 @@
   "analisa.insightNetPositive": "Kamu net positif — menerima",
   "analisa.insightNetNegative": "Kamu net negatif — mengeluarkan",
   "merchant.newPaymentDetected": "Pembayaran baru terdeteksi!",
-  "merchant.paymentReceived": "pembayaran diterima",
   "merchant.paymentsReceived": "pembayaran diterima",
   "merchant.realtimeActive": "Realtime aktif"
 }
