@@ -297,6 +297,7 @@ export async function getIncomingTransactions(
     .from("transactions")
     .select("*")
     .eq("payee_address", payeeAddress.toLowerCase())
+    .gt("amount", 0)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
