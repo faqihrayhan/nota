@@ -95,7 +95,7 @@ export default function MerchantPage() {
 
   // History state
   const [history, setHistory] = useState<Transaction[]>([]);
-  // Incoming payments (payee = me) — auto-detected via realtime
+  // Incoming payments (payee = me) — only NEW payments via realtime (not history)
   const [incoming, setIncoming] = useState<Transaction[]>([]);
 
   // Live IDR⇄USDC rate (fetched from CoinGecko; falls back offline)
@@ -110,7 +110,8 @@ export default function MerchantPage() {
     loadCatalog();
     loadCart();
     loadHistory();
-    loadIncoming();
+    // NOTE: loadIncoming() is intentionally NOT called on mount — the banner
+    // shows only NEW payments arriving via realtime, not historical ones.
     const unsub = subscribeToTransactions(() => {
       loadHistory();
       loadIncoming();
