@@ -191,7 +191,7 @@ console.error("Failed to load cart:", err);
   };
 
   // Add item to catalog
-  async function handleAddToCatalog(e: React.FormEvent) {
+  async function handleAddToCatalog(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!address || !newItemName.trim() || !newItemPrice.trim()) return;
     const priceNum = parseFloat(newItemPrice.replace(/[^0-9.]/g, ""));
@@ -235,7 +235,7 @@ console.error("Failed to load cart:", err);
     setEditBatch("");
   }
 
-  async function handleSaveEdit(e: React.FormEvent) {
+  async function handleSaveEdit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!address || !editingItem || !editName.trim() || !editPrice.trim()) return;
     const priceNum = parseFloat(editPrice.replace(/[^0-9.]/g, ""));
