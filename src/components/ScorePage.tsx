@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useWallet } from "@/context/WalletContext";
-import { getTransactions } from "@/lib/supabase";
+import { getTransactions, getIncomingTransactions } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { 
   ShieldCheck, 
@@ -22,6 +22,7 @@ export function ScorePage() {
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState<number | null>(null);
   const [txCount, setTxCount] = useState(0);
+  const [settlementRate, setSettlementRate] = useState<number | null>(null);
 
   useEffect(() => {
     async function calculateScore() {
@@ -32,8 +33,14 @@ export function ScorePage() {
       
       try {
         const txs = await getTransactions(address);
-        const count = txs.length;
+        const incoming = await getIncomingTransactions(address);
+        const all = [...txs, ...incoming];
+        const count = all.length;
         setTxCount(count);
+        
+        // Settlement rate: confirmed / total (not pending/failed)
+        const confirmed = all.filter((t) => t.status === "confirmed").length;
+        setSettlementRate(all.length > 0 ? Math.round((confirmed / all.length) * 100) : 100);
         
         // Simple logic: base score 300, +20 points per transaction, max 850
         const calculated = Math.min(850, 300 + (count * 20));
@@ -55,9 +62,9 @@ export function ScorePage() {
   };
 
   const getScoreLabel = (s: number) => {
-    if (s >= 750) return "Excellent";
-    if (s >= 600) return "Good";
-    return "Basic";
+    if (s >= 750) return t("score.excellent");
+    if (s >= 600) return t("score.good");
+    return t("score.basic");
   };
 
   if (!address) {
@@ -66,8 +73,8 @@ export function ScorePage() {
         <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-ink-2/50 border border-ink-line/60">
           <Zap className="h-10 w-10 text-text-muted" />
         </div>
-        <h1 className="font-display text-3xl font-bold text-text">Connect Wallet First</h1>
-        <p className="mt-4 text-text-muted">Connect your wallet to see your Nota reputation score.</p>
+        <h1 className="font-display text-3xl font-bold text-text">{t("score.connectFirst")}</h1>
+        <p className="mt-4 text-text-muted">{t("score.connectDesc")}</p>
       </section>
     );
   }
@@ -109,11 +116,11 @@ export function ScorePage() {
               <div className="mt-12 grid grid-cols-2 gap-4 border-t border-ink-line/40 pt-8">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-text font-display">{txCount}</div>
-                  <div className="text-xs text-text-muted uppercase tracking-widest mt-1">Transactions</div>
+                  <div className="text-xs text-text-muted uppercase tracking-widest mt-1">{t("score.transactions")}</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-text font-display">100%</div>
-                  <div className="text-xs text-text-muted uppercase tracking-widest mt-1">Settlement</div>
+                  <div className="text-2xl font-bold text-text font-display">{settlementRate ?? "—"}%</div>
+                  <div className="text-xs text-text-muted uppercase tracking-widest mt-1">{t("score.settlement")}</div>
                 </div>
               </div>
             </div>
