@@ -7,11 +7,11 @@ export const DEFAULT_IDR_PER_USDC = 16200.0;
 export const FALLBACK_RATES = {
   USDC: 1.0,
   IDR: 16200.0,
-  MYR: 4.70,
-  SGD: 1.35,
+  MYR: 4.09,
+  SGD: 1.28,
 };
 
-let cachedRates: { rates: Record<string, number>; timestamp: number } | null = null;
+let cachedRates: { rates: Record<string, number>; source: "coingecko" | "fallback"; timestamp: number } | null = null;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 export interface ExchangeRate {
@@ -21,47 +21,62 @@ export interface ExchangeRate {
   source: string;
 }
 
+export interface LiveRatesResult {
+  rates: Record<string, number>;
+  source: "coingecko" | "fallback";
+  lastUpdated: string;
+}
+
 /**
  * Fetch live exchange rates. Base currency is USD (which equals USDC).
+ * Returns the source so callers can label "live" vs "estimate" truthfully.
  */
-export async function fetchLiveRates(): Promise<Record<string, number>> {
+export async function fetchLiveRates(): Promise<LiveRatesResult> {
   const now = Date.now();
   if (cachedRates && now - cachedRates.timestamp < CACHE_TTL) {
-    return cachedRates.rates;
+    return {
+      rates: cachedRates.rates,
+      source: cachedRates.source,
+      lastUpdated: new Date(cachedRates.timestamp).toISOString(),
+    };
   }
 
   try {
-    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=idr,myr,sgd", {
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=idr,myr,sgd", {
       signal: AbortSignal.timeout(5000)
     });
     if (!res.ok) throw new Error("CoinGecko API failed");
     const data = await res.json();
-    
-    if (data && data.usd) {
+
+    if (data && data["usd-coin"] && data["usd-coin"].idr) {
       const rates = {
         USDC: 1.0,
-        IDR: data.usd.idr || FALLBACK_RATES.IDR,
-        MYR: data.usd.myr || FALLBACK_RATES.MYR,
-        SGD: data.usd.sgd || FALLBACK_RATES.SGD,
+        IDR: data["usd-coin"].idr || FALLBACK_RATES.IDR,
+        MYR: data["usd-coin"].myr || FALLBACK_RATES.MYR,
+        SGD: data["usd-coin"].sgd || FALLBACK_RATES.SGD,
       };
-      cachedRates = { rates, timestamp: now };
-      return rates;
+      cachedRates = { rates, source: "coingecko", timestamp: now };
+      return { rates, source: "coingecko", lastUpdated: new Date(now).toISOString() };
     }
   } catch (err) {
     console.warn("Using fallback exchange rates due to network/API error:", err);
   }
 
-  return FALLBACK_RATES;
+  return {
+    rates: FALLBACK_RATES,
+    source: "fallback",
+    lastUpdated: new Date().toISOString(),
+  };
 }
 
 export async function fetchExchangeRate(): Promise<ExchangeRate> {
-  const rates = await fetchLiveRates();
+  const { rates, source, lastUpdated } = await fetchLiveRates();
   const idrRate = rates.IDR || DEFAULT_IDR_PER_USDC;
   return {
     rate: idrRate,
     idrPerUsdc: idrRate,
-    lastUpdated: new Date().toISOString(),
-    source: "CoinGecko Live API"
+    lastUpdated,
+    source,
   };
 }
 
@@ -71,7 +86,7 @@ export function getCachedRate(): ExchangeRate {
     rate: idrRate,
     idrPerUsdc: idrRate,
     lastUpdated: new Date().toISOString(),
-    source: "Cache / Fallback"
+    source: cachedRates?.source || "fallback",
   };
 }
 
