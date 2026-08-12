@@ -85,12 +85,12 @@ export function Hero() {
               <div className="mt-12 flex items-center gap-6 text-xs font-mono text-text-muted">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                  <span>Verified On-Chain</span>
+                  <span>{t("hero.verified")}</span>
                 </div>
                 <div className="h-1 w-1 rounded-full bg-ink-line" />
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-amber-400" />
-                  <span>Instant Settlement</span>
+                  <span>{t("hero.instantSettlement")}</span>
                 </div>
                 <div className="h-1 w-1 rounded-full bg-ink-line" />
                 <span>{t("hero.chainNote")}</span>
@@ -108,7 +108,7 @@ export function Hero() {
             >
               <Image
                 src="/images/receipt-hero.svg"
-                alt="Nota Receipt Hero"
+                alt={t("hero.receiptAlt")}
                 width={680}
                 height={880}
                 priority

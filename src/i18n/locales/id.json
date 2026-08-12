@@ -344,5 +344,8 @@
   "merchant.refreshRate": "Muat ulang kurs",
   "footer.merchant": "Merchant POS",
   "footer.splitbill": "Split Bill",
-  "footer.notascore": "Nota Score"
+  "footer.notascore": "Nota Score",
+  "hero.verified": "Terverifikasi On-Chain",
+  "hero.instantSettlement": "Settlement Instan",
+  "hero.receiptAlt": "Nota Receipt Hero"
 }

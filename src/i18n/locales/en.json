@@ -344,5 +344,8 @@
   "nav.faqDesc": "Common questions",
   "nav.openMenu": "Open menu",
   "nav.closeMenu": "Close menu",
-  "merchant.refreshRate": "Refresh rate"
+  "merchant.refreshRate": "Refresh rate",
+  "hero.verified": "Verified On-Chain",
+  "hero.instantSettlement": "Instant Settlement",
+  "hero.receiptAlt": "Nota Receipt Hero"
 }
