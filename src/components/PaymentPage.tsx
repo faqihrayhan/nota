@@ -191,12 +191,16 @@ const unsub = subscribeToTransactions(() => loadHistory());
         params: [{ from: address, to: USDC_ADDRESS, data: calldata }],
       })) as string;
 
-      await new Promise((r) => setTimeout(r, 4000));
-
-      const receipt = (await provider.request({
-        method: "eth_getTransactionReceipt",
-        params: [txHash],
-      })) as { blockHash: string; blockNumber: string; status: string } | null;
+      // Poll for receipt (instead of fixed 4s sleep): check every 2s, up to 30s.
+      let receipt: { blockHash: string; blockNumber: string; status: string } | null = null;
+      const pollStart = Date.now();
+      while (!receipt && Date.now() - pollStart < 30_000) {
+        await new Promise((r) => setTimeout(r, 2000));
+        receipt = (await provider.request({
+          method: "eth_getTransactionReceipt",
+          params: [txHash],
+        })) as { blockHash: string; blockNumber: string; status: string } | null;
+      }
 
       const isSuccess = receipt?.status === "0x1";
       if (!isSuccess) {

@@ -87,52 +87,18 @@ export default function AnalisaPage() {
        .catch(() => {});
    }, [wallet.address]);
 
-  // Demo Data jika wallet belum terhubung
-  const DEMO_TRANSACTIONS: Transaction[] = [
-    {
-      id: "demo-1",
-      wallet_address: "0xdemo0000000000000000000000000000000001",
-      payer_address: "0xdemo...1234",
-      payee_address: "0xshop...5678",
-      amount: 4.5,
-      category: "makan",
-      items: [{ name: "Ramen Special", price: -4.5 }],
-      tx_hash: "0xdemo...tx1",
-      block_hash: "",
-      block_number: 55000000,
-      status: "confirmed",
-      mode: "payment",
-      created_at: "2026-08-01T10:00:00.000Z",
-    },
-    {
-      id: "demo-2",
-      wallet_address: "0xdemo0000000000000000000000000000000001",
-      payer_address: "0xdemo...1234",
-      payee_address: "0xstore...9999",
-      amount: 12.0,
-      category: "belanja",
-      items: [{ name: "Kemeja Casual", price: -12.0 }],
-      tx_hash: "0xdemo...tx2",
-      block_hash: "",
-      block_number: 55000001,
-      status: "confirmed",
-      mode: "payment",
-      created_at: "2026-07-30T10:00:00.000Z",
-    },
-  ];
-
   const isConnected = Boolean(wallet.address);
   const currentAddr = (wallet.address || "").toLowerCase();
   const periodStart = getPeriodStart(period);
 
-  // Jika wallet terhubung, filter berdasarkan address. Jika disconnect, tampilkan DEMO_TRANSACTIONS.
+  // Wallet terhubung: filter transaksi di mana saya payer, dalam periode.
   const filtered = isConnected
     ? transactions.filter((t) => {
         const isPayer = t.payer_address.toLowerCase() === currentAddr;
         const isWithinPeriod = new Date(t.created_at) >= periodStart;
         return isPayer && isWithinPeriod;
       })
-    : DEMO_TRANSACTIONS;
+    : [];
 
   const byCategory = filtered.reduce((acc, tx) => {
     const cat = tx.category || "lainnya";
@@ -384,7 +350,7 @@ export default function AnalisaPage() {
           </div>
 
           <ExportReport
-            transactions={isConnected ? transactions : DEMO_TRANSACTIONS}
+            transactions={isConnected ? transactions : []}
             disabled={!isConnected}
           />
 
