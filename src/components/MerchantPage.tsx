@@ -696,9 +696,9 @@ console.error("Failed to load cart:", err);
                       )}
                       <div className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-text-muted/60">
                         <span>
-                          1 USDC ≈ {formatIDR(Math.round((allRates.IDR || rate.idrPerUsdc)))}
+                          1 USDC ≈ {formatCurrency(allRates[currencyMode] || 1, currencyMode)}
                           {rateSource === "coingecko" ? ` (${t("merchant.liveRate")})` : ` (${t("merchant.estimateRate")})`}
-                        </span>
+                         </span>
                         <button
                           onClick={handleRefreshRate}
                           disabled={refreshingRate}
