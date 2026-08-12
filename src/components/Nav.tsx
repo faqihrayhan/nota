@@ -56,10 +56,10 @@ export function Nav() {
   ];
 
   const docsItems = [
-    { icon: BookOpen, title: t("nav.documentation"), desc: t("nav.documentationDesc"), href: "#docs", tag: "New" },
-    { icon: Code, title: t("nav.apiRef"), desc: t("nav.apiRefDesc"), href: "#api" },
-    { icon: FileText, title: t("nav.whitepaper"), desc: t("nav.whitepaperDesc"), href: "#whitepaper" },
-    { icon: HelpCircle, title: t("nav.faq"), desc: t("nav.faqDesc"), href: "#faq" },
+    { icon: BookOpen, title: t("nav.documentation"), desc: t("nav.documentationDesc"), href: "https://nota.mintlify.app", tag: "Live" },
+    { icon: Code, title: t("nav.apiRef"), desc: t("nav.apiRefDesc"), href: "https://nota.mintlify.app/docs/smart-contracts/uups-architecture" },
+    { icon: FileText, title: t("nav.whitepaper"), desc: t("nav.whitepaperDesc"), href: "https://nota.mintlify.app/docs/core-concepts/verifiable-accounting" },
+    { icon: HelpCircle, title: t("nav.faq"), desc: t("nav.faqDesc"), href: "https://nota.mintlify.app/docs/get-started/quickstart" },
   ];
 
   return (
@@ -162,7 +162,6 @@ export function Nav() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <div className="flex items-center rounded-xl border border-ink-line/40 p-0.5"><LanguageToggle /></div>
           <div className="flex items-center"><ThemeToggle /></div>
           <div className="w-px h-6 bg-ink-line/40 mx-0.5" />
             <div className="flex items-center gap-2"> <WalletButton />
@@ -206,9 +205,8 @@ export function Nav() {
               </Link>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-ink-line/40 flex items-center gap-3">
-            <div className="flex-1 flex justify-center"><LanguageToggle /></div>
-            <div className="flex-1 flex justify-center"><ThemeToggle /></div>
+          <div className="mt-4 pt-4 border-t border-ink-line/40 flex items-center justify-center">
+            <ThemeToggle />
           </div>
           <div className="mt-3"><WalletButton compact /></div>
         </div>
