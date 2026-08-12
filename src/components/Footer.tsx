@@ -16,8 +16,11 @@ export function Footer() {
       title: t("footer.product"),
       links: [
         { label: t("footer.payment"), href: "/payment" },
+        { label: t("footer.merchant"), href: "/merchant" },
         { label: t("footer.analisa"), href: "/analisa" },
         { label: t("footer.forecast"), href: "/forecast" },
+        { label: t("footer.splitbill"), href: "/split-bill" },
+        { label: t("footer.notascore"), href: "/score" },
       ],
     },
     {

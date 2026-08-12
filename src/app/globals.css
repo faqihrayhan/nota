@@ -213,3 +213,218 @@ body {
     scroll-behavior: auto !important;
   }
 }
+/* ============================================================
+   HERO STACK 3D — receipt (Opsi A: full replace)
+   ============================================================ */
+
+.hero-stage {
+  display: grid;
+  place-items: center;
+  padding: 32px 16px 48px;
+  min-height: 480px;
+  perspective: 1400px;
+}
+
+.hero-stack {
+  position: relative;
+  width: min(420px, 92vw);
+  aspect-ratio: 420 / 520;
+  transform-style: preserve-3d;
+  transition: transform 220ms ease-out;
+  will-change: transform;
+}
+
+.hero-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 24px 48px -12px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+/* Layer paling belakang — paling gelap, paling kecil offset */
+.hero-card--back {
+  background: linear-gradient(160deg, #2e3532 0%, #1f2522 100%);
+  transform: translateZ(-40px) translate(-12px, -10px) rotate(-2.5deg);
+}
+
+.hero-card--mid {
+  background: linear-gradient(160deg, #d9cdb8 0%, #c9bda6 100%);
+  transform: translateZ(-20px) translate(-6px, -5px) rotate(-1.2deg);
+}
+
+/* Layer depan — receipt cream */
+.hero-card--front {
+  background: linear-gradient(180deg, #f2ead9 0%, #e6dcc7 100%);
+  color: #0d100d;
+  padding: 22px 24px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
+.hero-rcpt__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.hero-rcpt__logo {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: #0d100d;
+  color: #f2ead9;
+  font-weight: 700;
+  font-size: 20px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.hero-rcpt__title {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+.hero-rcpt__sub {
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: #6f6a5c;
+  margin-top: 2px;
+}
+.hero-rcpt__qr {
+  margin-left: auto;
+  width: 58px;
+  height: 58px;
+  flex-shrink: 0;
+}
+.hero-rcpt__qr-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  gap: 1px;
+  width: 100%;
+  height: 100%;
+}
+.hero-rcpt__qr-grid i {
+  display: block;
+  border-radius: 0.5px;
+}
+.hero-rcpt__qr-grid i.on { background: #0d100d; }
+.hero-rcpt__qr-grid i.off { background: transparent; }
+
+.hero-rcpt__divider {
+  border-top: 1.5px dashed #b8b09b;
+}
+.hero-rcpt__divider--dots { border-top-style: dotted; }
+
+.hero-rcpt__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.hero-rcpt__label {
+  font-style: italic;
+  font-size: 11px;
+  color: #8a8471;
+}
+.hero-rcpt__value {
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.hero-rcpt__blue { color: #2563eb; font-style: normal; }
+
+.hero-rcpt__total {
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.hero-rcpt__total strong { font-weight: 800; }
+
+.hero-rcpt__foot {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.hero-rcpt__foot-label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: #8a8471;
+}
+.hero-rcpt__foot-val {
+  font-weight: 800;
+  font-size: 13px;
+  margin-top: 2px;
+}
+.hero-rcpt__stamp {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 2px solid #15803d;
+  color: #15803d;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  border-radius: 6px;
+  transform: rotate(-6deg);
+  background: rgba(21, 128, 61, 0.06);
+}
+
+.hero-rcpt__tearline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 16px;
+  background:
+    radial-gradient(circle at 10px 0, transparent 0 9px, rgba(0,0,0,0.28) 9.5px 12px, transparent 12.5px);
+  background-size: 24px 16px;
+  background-repeat: repeat-x;
+  background-position: 4px 0;
+  opacity: 0.55;
+}
+
+/* Hover: float ringan */
+.hero-stage:hover .hero-card--front {
+  transform: translateZ(0) translateY(-6px);
+}
+/* ============================================================
+   HERO 3D — PNG receipt (transparent bg)
+   ============================================================ */
+
+.hero-3d-wrap {
+  display: grid;
+  place-items: center;
+  padding: 40px 16px 56px;
+  min-height: 520px;
+}
+
+.hero-3d-card {
+  position: relative;
+  width: min(480px, 90vw);
+  filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.45));
+  transition: transform 220ms ease-out;
+  will-change: transform;
+}
+
+.hero-3d-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Hover: float ringan */
+.hero-3d-wrap:hover .hero-3d-card {
+  transform: perspective(1400px) rotateX(var(--rx, 0)) rotateY(var(--ry, 0)) translateY(-8px);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .hero-3d-wrap { padding: 28px 12px 40px; min-height: 440px; }
+  .hero-3d-card { width: min(400px, 94vw); }
+}

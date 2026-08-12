@@ -3,15 +3,24 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
+import {
+  INVOICE_MANAGER_ADDRESS,
+  encodeCreateAndPayInvoice,
+  encodeApprove,
+  encodeAllowance,
+  keccak256Hex,
+} from "@/lib/invoice-manager";
 import { USDC_ADDRESS } from "@/lib/usdc-abi";
 import {
   saveTransaction,
   findTransactionByNonce,
   subscribeToTransactions,
   getTransactions,
+  deductStockAfterPayment,
   type Transaction,
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
+import { type CurrencyCode, CURRENCY_SYMBOLS, fetchLiveRates, convertFromUsdc, formatCurrency } from "@/lib/exchange-rate";
 import { QRScanner } from "@/components/QRScanner";
 import ReceiptModal from "@/components/ReceiptModal";
 import { cn } from "@/lib/utils";
@@ -44,14 +53,6 @@ function decodeQR(raw: string): { payerAddress: string; totalAmount: string; ite
   } catch {
     return null;
   }
-}
-
-function encodeTransferFrom(from: string, to: string, amount: string): string {
-  const fnSig = "0x23b872dd";
-  const paddedFrom = from.toLowerCase().replace("0x", "").padStart(64, "0");
-  const paddedTo = to.toLowerCase().replace("0x", "").padStart(64, "0");
-  const paddedAmount = BigInt(amount).toString(16).padStart(64, "0");
-  return fnSig + paddedFrom + paddedTo + paddedAmount;
 }
 
 function resolveProvider(walletId: string) {
@@ -96,14 +97,25 @@ function PaymentPageInner() {
   const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
   const [history, setHistory] = useState<Transaction[]>([]);
   const [copied, setCopied] = useState(false);
+  const [currencyMode, setCurrencyMode] = useState<CurrencyCode>("USDC");
+  const [allRates, setAllRates] = useState<Record<string, number>>({});
 
   // Load transaction history when wallet connects
   useEffect(() => {
+    fetchLiveRates().then((r) => setAllRates(r.rates));
     if (!address) return;
     loadHistory();
 const unsub = subscribeToTransactions(() => loadHistory());
     return () => unsub();
   }, [address]);
+
+  const toggleCurrency = () => {
+    const sequence: CurrencyCode[] = ["USDC", "IDR", "MYR", "SGD"];
+    setCurrencyMode((m) => {
+      const idx = sequence.indexOf(m);
+      return sequence[(idx + 1) % sequence.length];
+    });
+  };
 
   async function loadHistory() {
     if (!address) return;
@@ -157,8 +169,43 @@ const unsub = subscribeToTransactions(() => loadHistory());
 
   const closeCamera = useCallback(() => setCameraOpen(false), []);
 
+  async function getAllowance(provider: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }, owner: string, spender: string): Promise<bigint> {
+    const calldata = encodeAllowance(owner, spender);
+    const hex = (await provider.request({
+      method: "eth_call",
+      params: [{ from: owner, to: USDC_ADDRESS, data: calldata }, "latest"],
+    })) as string;
+    return BigInt(hex || "0x0");
+  }
+
+  async function ensureAllowance(provider: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }, owner: string, spender: string, needed: bigint): Promise<void> {
+    const current = await getAllowance(provider, owner, spender);
+    if (current >= needed) return;
+    const calldata = encodeApprove(spender, needed);
+    const approveTx = (await provider.request({
+      method: "eth_sendTransaction",
+      params: [{ from: owner, to: USDC_ADDRESS, data: calldata }],
+    })) as string;
+    // Wait for approve receipt
+    const approveStart = Date.now();
+    while (Date.now() - approveStart < 30_000) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const rec = (await provider.request({
+        method: "eth_getTransactionReceipt",
+        params: [approveTx],
+      })) as { status: string } | null;
+      if (rec && rec.status === "0x1") return;
+      if (rec && rec.status !== "0x1") throw new Error("Approve failed");
+    }
+    throw new Error("Approve timeout");
+  }
+
   async function handlePay() {
     if (!address || !scannedData) return;
+    if (!INVOICE_MANAGER_ADDRESS || INVOICE_MANAGER_ADDRESS === "0x0000000000000000000000000000000000000000") {
+      setError(t("payment.error.contractNotDeployed"));
+      return;
+    }
     const provider = resolveProvider(wallet.walletId || "");
     if (!provider) {
       setError(t("payment.error.walletNotFound"));
@@ -169,21 +216,38 @@ const unsub = subscribeToTransactions(() => loadHistory());
     try {
       const amountInUsdc = parseFloat(scannedData.totalAmount) / 1_000_000;
       const payeeAddress = scannedData.payerAddress.toLowerCase();
-      const amountInUnits = BigInt(Math.floor(amountInUsdc * 1_000_000)).toString();
+      const amountInUnits = BigInt(Math.floor(amountInUsdc * 1_000_000));
 
-      const calldata = encodeTransferFrom(address, payeeAddress, amountInUnits);
+      // dataHash = keccak256 of canonical JSON (nonce + payer + payee + amount)
+      // → verifiable accounting: anyone can recompute & verify on-chain
+      const dataHash = await keccak256Hex(JSON.stringify({
+        nonce: scannedData.nonce,
+        payer: address.toLowerCase(),
+        payee: payeeAddress,
+        amount: amountInUnits.toString(),
+      }));
+
+      // 1. Approve USDC to invoice manager if needed
+      await ensureAllowance(provider, address, INVOICE_MANAGER_ADDRESS, amountInUnits);
+
+      // 2. One-shot: create invoice + pay via contract (verifiable on-chain)
+      const calldata = encodeCreateAndPayInvoice(payeeAddress, amountInUnits, dataHash);
 
       const txHash = (await provider.request({
         method: "eth_sendTransaction",
-        params: [{ from: address, to: USDC_ADDRESS, data: calldata }],
+        params: [{ from: address, to: INVOICE_MANAGER_ADDRESS, data: calldata }],
       })) as string;
 
-      await new Promise((r) => setTimeout(r, 4000));
-
-      const receipt = (await provider.request({
-        method: "eth_getTransactionReceipt",
-        params: [txHash],
-      })) as { blockHash: string; blockNumber: string; status: string } | null;
+      // Poll for receipt (instead of fixed 4s sleep): check every 2s, up to 30s.
+      let receipt: { blockHash: string; blockNumber: string; status: string } | null = null;
+      const pollStart = Date.now();
+      while (!receipt && Date.now() - pollStart < 30_000) {
+        await new Promise((r) => setTimeout(r, 2000));
+        receipt = (await provider.request({
+          method: "eth_getTransactionReceipt",
+          params: [txHash],
+        })) as { blockHash: string; blockNumber: string; status: string } | null;
+      }
 
       const isSuccess = receipt?.status === "0x1";
       if (!isSuccess) {
@@ -206,6 +270,11 @@ const unsub = subscribeToTransactions(() => loadHistory());
       };
 
       await saveTransaction(tx);
+      try {
+        await deductStockAfterPayment(payeeAddress, scannedData.items);
+      } catch (stockErr) {
+        console.error("Failed to deduct stock:", stockErr);
+      }
       await loadHistory();
       setSuccessTx(tx as Transaction);
       setScannedData(null);
@@ -320,7 +389,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
           <div className="mt-6 space-y-2 rounded-xl border border-ink-line/30 bg-ink p-4 text-left">
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">{t("payment.amount")}</span>
-              <span className="font-medium">{formatUSDC(successTx.amount)} USDC</span>
+              <span className="font-medium">{formatCurrency(convertFromUsdc(successTx.amount, currencyMode, allRates), currencyMode)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">{t("payment.txHash")}</span>
@@ -423,7 +492,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium">{formatUSDC(tx.amount)} USDC</p>
+                  <p className="text-sm font-medium">{formatCurrency(convertFromUsdc(tx.amount, currencyMode, allRates), currencyMode)}</p>
                   <p className={cn(
                     "text-xs capitalize",
                     tx.status === "confirmed" ? "text-stamp-green" : tx.status === "failed" ? "text-warn-amber" : "text-text-muted"
