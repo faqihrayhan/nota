@@ -12,20 +12,27 @@
     "light": "#60a5fa",
     "dark": "#1d4ed8"
   },
-  "navigation": [
-    {
-      "group": "Get Started",
-      "pages": ["introduction", "quickstart"]
-    },
-    {
-      "group": "Core Concepts",
-      "pages": ["verifiable-accounting", "arc-integration"]
-    },
-    {
-      "group": "Smart Contracts",
-      "pages": ["uups-architecture", "data-hash"]
-    }
-  ],
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": ["verifiable-accounting", "arc-integration"]
+          },
+          {
+            "group": "Smart Contracts",
+            "pages": ["uups-architecture", "data-hash"]
+          }
+        ]
+      }
+    ]
+  },
   "footerSocials": {
     "x": "https://x.com/notaonarc",
     "github": "https://github.com/faqihrayhan/nota"
