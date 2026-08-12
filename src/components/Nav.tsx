@@ -56,10 +56,10 @@ export function Nav() {
   ];
 
   const docsItems = [
-    { icon: BookOpen, title: "Documentation", desc: "Guides & API reference", href: "#docs", tag: "New" },
-    { icon: Code, title: "API Reference", desc: "Endpoints & SDK", href: "#api" },
-    { icon: FileText, title: "Whitepaper", desc: "Technical overview", href: "#whitepaper" },
-    { icon: HelpCircle, title: "FAQ", desc: "Common questions", href: "#faq" },
+    { icon: BookOpen, title: t("nav.documentation"), desc: t("nav.documentationDesc"), href: "#docs", tag: "New" },
+    { icon: Code, title: t("nav.apiRef"), desc: t("nav.apiRefDesc"), href: "#api" },
+    { icon: FileText, title: t("nav.whitepaper"), desc: t("nav.whitepaperDesc"), href: "#whitepaper" },
+    { icon: HelpCircle, title: t("nav.faq"), desc: t("nav.faqDesc"), href: "#faq" },
   ];
 
   return (
@@ -170,7 +170,7 @@ export function Nav() {
 
         </div>
 
-        <button onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? "Tutup menu" : "Buka menu"} aria-expanded={menuOpen} className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl border border-ink-line/60 hover:border-ink-line hover:bg-white/[0.03] transition-all duration-300">
+        <button onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? t("nav.closeMenu") : t("nav.openMenu")} aria-expanded={menuOpen} className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl border border-ink-line/60 hover:border-ink-line hover:bg-white/[0.03] transition-all duration-300">
           <div className="relative h-5 w-5">
             <span className={cn("absolute left-0 top-1 h-[2px] w-5 bg-text rounded-full transition-all duration-300 origin-center", menuOpen && "top-1/2 -translate-y-1/2 rotate-45")} />
             <span className={cn("absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-text rounded-full transition-all duration-300", menuOpen ? "w-0 opacity-0" : "w-5 opacity-100")} />

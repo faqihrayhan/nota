@@ -694,7 +694,7 @@ console.error("Failed to load cart:", err);
                         <button
                           onClick={handleRefreshRate}
                           disabled={refreshingRate}
-                          title="Refresh rate"
+                          title={t("merchant.refreshRate")}
                           className="rounded-md p-1 text-text-muted/60 transition-colors hover:bg-ink-line/40 hover:text-text disabled:opacity-50"
                         >
                           <RefreshCcw className={cn("h-3 w-3", refreshingRate && "animate-spin")} />
