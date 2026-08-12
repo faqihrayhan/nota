@@ -19,15 +19,24 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": ["introduction", "quickstart"]
+            "pages": [
+              "docs/get-started/introduction",
+              "docs/get-started/quickstart"
+            ]
           },
           {
             "group": "Core Concepts",
-            "pages": ["verifiable-accounting", "arc-integration"]
+            "pages": [
+              "docs/core-concepts/verifiable-accounting",
+              "docs/core-concepts/arc-integration"
+            ]
           },
           {
             "group": "Smart Contracts",
-            "pages": ["uups-architecture", "data-hash"]
+            "pages": [
+              "docs/smart-contracts/uups-architecture",
+              "docs/smart-contracts/data-hash"
+            ]
           }
         ]
       }
