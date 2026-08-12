@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { getTransactions, type Transaction } from "@/lib/supabase";
+import { getTransactions, getIncomingTransactions, type Transaction } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import ReceiptModal from "@/components/ReceiptModal";
 import ExportReport from "@/components/ExportReport";
@@ -15,6 +15,9 @@ import {
   Loader2,
   ExternalLink,
   FileText,
+  TrendingUp,
+  ArrowDownCircle,
+  Scale,
 } from "lucide-react";
 
 
@@ -64,21 +67,25 @@ export default function AnalisaPage() {
   const [loading, setLoading] = useState(true);
 
    const [expandedTx, setExpandedTx] = useState<string | null>(null);
-  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
+   const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
+   const [incoming, setIncoming] = useState<Transaction[]>([]);
 
-  useEffect(() => {
-    if (!wallet.address) {
-      setLoading(false); // Langsung matikan loading jika wallet disconnect
-      return;
-    }
-    setLoading(true);
-    getTransactions(wallet.address)
-      .then((data) => {
-        setTransactions(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [wallet.address]);
+   useEffect(() => {
+     if (!wallet.address) {
+       setLoading(false); // Langsung matikan loading jika wallet disconnect
+       return;
+     }
+     setLoading(true);
+     getTransactions(wallet.address)
+       .then((data) => {
+         setTransactions(data);
+         setLoading(false);
+       })
+       .catch(() => setLoading(false));
+     getIncomingTransactions(wallet.address)
+       .then(setIncoming)
+       .catch(() => {});
+   }, [wallet.address]);
 
   // Demo Data jika wallet belum terhubung
   const DEMO_TRANSACTIONS: Transaction[] = [
@@ -145,6 +152,53 @@ export default function AnalisaPage() {
   const sortedDays = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
   const maxDayValue = Math.max(...Object.values(byDay), 1);
 
+  // ── Cashflow (Phase 5+) ────────────────────────────────────────
+  // outflow = transactions where I'm the payer (existing filtered list)
+  // inflow  = transactions where I'm the payee (incoming)
+  const inflowFiltered = incoming.filter((t) => {
+    const isPayee = t.payee_address.toLowerCase() === currentAddr;
+    const isWithinPeriod = new Date(t.created_at) >= periodStart;
+    return isPayee && isWithinPeriod && t.status !== "failed";
+  });
+
+  const totalInflow = inflowFiltered.reduce((s, t) => s + t.amount, 0);
+  const totalOutflow = filtered.reduce((s, t) => s + t.amount, 0);
+  const netBalance = totalInflow - totalOutflow;
+
+  // Daily inflow/outflow pairs for the trend chart
+  const daySet = new Set([
+    ...sortedDays.map(([d]) => d),
+    ...inflowFiltered.map((t) => new Date(t.created_at).toISOString().split("T")[0]),
+  ]);
+  const trendDays = [...daySet].sort();
+  const byInflowDay = inflowFiltered.reduce((acc, tx) => {
+    const day = new Date(tx.created_at).toISOString().split("T")[0];
+    acc[day] = (acc[day] || 0) + tx.amount;
+    return acc;
+  }, {} as Record<string, number>);
+  const trendData = trendDays.map((day) => ({
+    day,
+    inflow: byInflowDay[day] || 0,
+    outflow: byDay[day] || 0,
+  }));
+  const maxTrendValue = Math.max(...trendData.flatMap((d) => [d.inflow, d.outflow]), 1);
+
+  // Insight helpers
+  const dayLabels = trendDays.map((d) => {
+    const dt = new Date(d + "T00:00:00");
+    return dt.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  });
+  const insightInflow = totalInflow > 0;
+  const insightOutflow = totalOutflow > 0;
+  const insightNet = Math.abs(netBalance) > 0.0001;
+  const topInflowSource = inflowFiltered.reduce((acc, t) => {
+    const from = t.payer_address.toLowerCase();
+    acc[from] = (acc[from] || 0) + t.amount;
+    return acc;
+  }, {} as Record<string, number>);
+  const topInflowSourceEntry = Object.entries(topInflowSource).sort((a, b) => b[1] - a[1])[0];
+  const busiestDay = trendData.slice().sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow))[0];
+
 
   return (
     <section className="relative mx-auto max-w-4xl px-5 py-12">
@@ -187,6 +241,122 @@ export default function AnalisaPage() {
         </div>
       ) : (
         <div className="mt-8 space-y-6">
+          {/* Cashflow Overview — inflow / outflow / net */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-stamp-green/30 bg-ink p-6">
+              <div className="flex items-center gap-2 text-stamp-green">
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-xs font-mono uppercase">{t("analisa.inflow")}</span>
+              </div>
+              <p className="mt-2 font-display text-2xl font-semibold">{formatUSDC(totalInflow)} USDC</p>
+              <p className="mt-1 text-xs text-text-muted">{t("analisa.inflowDesc")}</p>
+            </div>
+            <div className="rounded-2xl border border-warn-amber/30 bg-ink p-6">
+              <div className="flex items-center gap-2 text-warn-amber">
+                <ArrowDownCircle className="h-4 w-4" />
+                <span className="text-xs font-mono uppercase">{t("analisa.outflow")}</span>
+              </div>
+              <p className="mt-2 font-display text-2xl font-semibold">{formatUSDC(totalOutflow)} USDC</p>
+              <p className="mt-1 text-xs text-text-muted">{t("analisa.outflowDesc")}</p>
+            </div>
+            <div className={cn("rounded-2xl border bg-ink p-6", netBalance >= 0 ? "border-accent/40" : "border-warn-amber/40")}>
+              <div className={cn("flex items-center gap-2", netBalance >= 0 ? "text-accent" : "text-warn-amber")}>
+                <Scale className="h-4 w-4" />
+                <span className="text-xs font-mono uppercase">{t("analisa.netBalance")}</span>
+              </div>
+              <p className={cn("mt-2 font-display text-2xl font-semibold", netBalance >= 0 ? "text-accent" : "text-warn-amber")}>
+                {netBalance >= 0 ? "+" : ""}{formatUSDC(netBalance)} USDC
+              </p>
+              <p className="mt-1 text-xs text-text-muted">{t("analisa.netDesc")}</p>
+            </div>
+          </div>
+
+          {/* Cashflow trend chart (inflow vs outflow per day) */}
+          {trendData.length > 0 && (
+            <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
+              <h3 className="font-display text-sm font-semibold">{t("analisa.cashflowTrend")}</h3>
+              <p className="mt-1 text-xs text-text-muted">{t("analisa.cashflowTrendDesc")}</p>
+              <div className="mt-5 flex h-40 items-end gap-3 overflow-x-auto pb-1">
+                {trendData.map((d, i) => (
+                  <div key={d.day} className="flex min-w-[36px] flex-1 flex-col items-center gap-1">
+                    <div className="flex w-full flex-1 items-end justify-center gap-1">
+                      <div
+                        className="w-3 rounded-t bg-stamp-green/80 transition-all duration-500"
+                        style={{ height: `${(d.inflow / maxTrendValue) * 100}%`, minHeight: d.inflow > 0 ? 4 : 0 }}
+                        title={`${t("analisa.inflow")}: ${formatUSDC(d.inflow)}`}
+                      />
+                      <div
+                        className="w-3 rounded-t bg-warn-amber/80 transition-all duration-500"
+                        style={{ height: `${(d.outflow / maxTrendValue) * 100}%`, minHeight: d.outflow > 0 ? 4 : 0 }}
+                        title={`${t("analisa.outflow")}: ${formatUSDC(d.outflow)}`}
+                      />
+                    </div>
+                    <span className="text-[10px] text-text-faint">{dayLabels[i]}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-4 text-[11px] text-text-muted">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-stamp-green" /> {t("analisa.inflow")}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-warn-amber" /> {t("analisa.outflow")}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Auto insights */}
+          {(insightInflow || insightOutflow) && (
+            <div className="rounded-2xl border border-accent/30 bg-accent/5 p-6">
+              <h3 className="font-display text-sm font-semibold text-accent">{t("analisa.insightTitle")}</h3>
+              <ul className="mt-3 space-y-2 text-sm">
+                {insightOutflow && (
+                  <li className="flex items-start gap-2 text-text">
+                    <span className="mt-0.5 text-warn-amber">●</span>
+                    <span>
+                      {t("analisa.insightTopCategory")}{" "}
+                      <strong className="capitalize">{maxCategory ? t(`payment.cat.${maxCategory[0]}`) : "—"}</strong>{" "}
+                      ({maxCategory ? ((maxCategory[1] / Math.max(totalOutflow, 0.0001)) * 100).toFixed(0) : 0}%{" "}
+                      {t("analisa.insightOfOutflow")})
+                    </span>
+                  </li>
+                )}
+                {insightInflow && topInflowSourceEntry && (
+                  <li className="flex items-start gap-2 text-text">
+                    <span className="mt-0.5 text-stamp-green">●</span>
+                    <span>
+                      {t("analisa.insightTopSource")}{" "}
+                      <strong className="font-mono text-xs">
+                        {topInflowSourceEntry[0].slice(0, 10)}…{topInflowSourceEntry[0].slice(-6)}
+                      </strong>{" "}
+                      ({formatUSDC(topInflowSourceEntry[1])} USDC)
+                    </span>
+                  </li>
+                )}
+                {busiestDay && (busiestDay.inflow + busiestDay.outflow) > 0 && (
+                  <li className="flex items-start gap-2 text-text">
+                    <span className="mt-0.5 text-accent">●</span>
+                    <span>
+                      {t("analisa.insightBusiestDay")}{" "}
+                      <strong>{dayLabels[trendData.indexOf(busiestDay)]}</strong> —{" "}
+                      {formatUSDC(busiestDay.inflow + busiestDay.outflow)} USDC
+                    </span>
+                  </li>
+                )}
+                {insightNet && (
+                  <li className="flex items-start gap-2 text-text">
+                    <span className={cn("mt-0.5", netBalance >= 0 ? "text-accent" : "text-warn-amber")}>●</span>
+                    <span>
+                      {netBalance >= 0 ? t("analisa.insightNetPositive") : t("analisa.insightNetNegative")}{" "}
+                      <strong>{formatUSDC(Math.abs(netBalance))} USDC</strong>
+                    </span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
               <div className="flex items-center gap-2 text-text-muted">

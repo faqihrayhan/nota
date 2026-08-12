@@ -15,6 +15,8 @@ import {
   clearCart,
   saveTransaction,
   getTransactions,
+  getIncomingTransactions,
+  subscribeToTransactions,
   type CatalogItem,
   type CartItem,
   type Transaction,
@@ -95,6 +97,8 @@ export default function MerchantPage() {
 
   // History state
   const [history, setHistory] = useState<Transaction[]>([]);
+  // Incoming payments (payee = me) — auto-detected via realtime
+  const [incoming, setIncoming] = useState<Transaction[]>([]);
 
   // Live IDR⇄USDC rate (fetched from CoinGecko; falls back offline)
   const [rate, setRate] = useState<ExchangeRate>(() => getCachedRate());
@@ -107,6 +111,12 @@ export default function MerchantPage() {
     loadCatalog();
     loadCart();
     loadHistory();
+    loadIncoming();
+    const unsub = subscribeToTransactions(() => {
+      loadHistory();
+      loadIncoming();
+    });
+    return () => unsub();
   }, [address]);
 
   // Refresh the exchange rate on mount
@@ -176,6 +186,16 @@ console.error("Failed to load cart:", err);
       setHistory(txs);
     } catch (err) {
       console.error("Failed to load history:", err);
+    }
+  }
+
+  async function loadIncoming() {
+    if (!address) return;
+    try {
+      const txs = await getIncomingTransactions(address);
+      setIncoming(txs);
+    } catch (err) {
+      console.error("Failed to load incoming payments:", err);
     }
   }
 
@@ -397,6 +417,21 @@ console.error("Failed to load cart:", err);
               </a>
             )}
           </div>
+
+        {/* Incoming payment banner (auto-detected) */}
+        {incoming.length > 0 && (
+          <div className="mb-6 flex items-center gap-3 rounded-xl border border-stamp-green/30 bg-stamp-green/5 px-4 py-3 text-sm">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-stamp-green opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-stamp-green" />
+            </span>
+            <span className="text-stamp-green">
+              <span className="font-semibold">{t("merchant.newPaymentDetected")}</span>{" "}
+              {incoming.length} {incoming.length > 1 ? t("merchant.paymentsReceived") : t("merchant.paymentReceived")} —{" "}
+              {formatUSDC(incoming.reduce((s, tx) => s + tx.amount, 0))} USDC
+            </span>
+          </div>
+        )}
 
           {error && (
             <div className="mb-6 flex items-center gap-2 rounded-xl border border-warn-amber/40 bg-warn-amber/10 px-4 py-3 text-sm text-warn-amber">
@@ -764,6 +799,17 @@ console.error("Failed to load cart:", err);
                   {t("merchant.simulatePayment")}
                 </button>
               </div>
+
+              {/* Auto-detect status */}
+              {incoming.length > 0 && (
+                <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-stamp-green/30 bg-stamp-green/5 px-4 py-2.5 text-xs text-stamp-green">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-stamp-green opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-stamp-green" />
+                  </span>
+                  {t("merchant.realtimeActive")} · {incoming.length} {t("merchant.paymentsReceived")}
+                </div>
+              )}
             </div>
           </div>
         )}
