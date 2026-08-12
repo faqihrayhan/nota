@@ -330,5 +330,16 @@
   "splitBill.expiresIn": "kadaluarsa dalam 10 menit",
   "splitBill.copied": "Tersalin!",
   "splitBill.copyQr": "Salin data QR",
-  "splitBill.scanHint": "Scan dengan Nota Payment untuk membayar bagianmu on-chain."
+  "splitBill.scanHint": "Scan dengan Nota Payment untuk membayar bagianmu on-chain.",
+  "nav.documentation": "Dokumentasi",
+  "nav.documentationDesc": "Panduan & referensi API",
+  "nav.apiRef": "Referensi API",
+  "nav.apiRefDesc": "Endpoint & SDK",
+  "nav.whitepaper": "Whitepaper",
+  "nav.whitepaperDesc": "Gambaran teknis",
+  "nav.faq": "FAQ",
+  "nav.faqDesc": "Pertanyaan umum",
+  "nav.openMenu": "Buka menu",
+  "nav.closeMenu": "Tutup menu",
+  "merchant.refreshRate": "Muat ulang kurs"
 }

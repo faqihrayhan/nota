@@ -333,5 +333,16 @@
   "splitBill.expiresIn": "expires in 10 min",
   "splitBill.copied": "Copied!",
   "splitBill.copyQr": "Copy QR data",
-  "splitBill.scanHint": "Scan with Nota Payment to settle your share on-chain."
+  "splitBill.scanHint": "Scan with Nota Payment to settle your share on-chain.",
+  "nav.documentation": "Documentation",
+  "nav.documentationDesc": "Guides & API reference",
+  "nav.apiRef": "API Reference",
+  "nav.apiRefDesc": "Endpoints & SDK",
+  "nav.whitepaper": "Whitepaper",
+  "nav.whitepaperDesc": "Technical overview",
+  "nav.faq": "FAQ",
+  "nav.faqDesc": "Common questions",
+  "nav.openMenu": "Open menu",
+  "nav.closeMenu": "Close menu",
+  "merchant.refreshRate": "Refresh rate"
 }
