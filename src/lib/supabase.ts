@@ -304,6 +304,58 @@ export async function getIncomingTransactions(
   return data || [];
 }
 
+export interface MerchantInflowStats {
+  totalRevenueUsdc: number;
+  todayRevenueUsdc: number;
+  totalTransactionsCount: number;
+  topSellingItems: { name: string; count: number; totalUsdc: number }[];
+}
+
+export async function getMerchantInflowStats(
+  payeeAddress: string
+): Promise<MerchantInflowStats> {
+  const txs = await getIncomingTransactions(payeeAddress, 500);
+
+  let totalRevenueUsdc = 0;
+  let todayRevenueUsdc = 0;
+  const itemMap = new Map<string, { count: number; totalUsdc: number }>();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  for (const tx of txs) {
+    const txAmount = Number(tx.amount) || 0;
+    totalRevenueUsdc += txAmount;
+
+    if (tx.created_at && tx.created_at.startsWith(todayStr)) {
+      todayRevenueUsdc += txAmount;
+    }
+
+    if (Array.isArray(tx.items)) {
+      for (const item of tx.items) {
+        if (!item || !item.name) continue;
+        const current = itemMap.get(item.name) || { count: 0, totalUsdc: 0 };
+        const itemPrice = typeof item.price === "number" ? (item.price > 1000 ? item.price / 1_000_000 : item.price) : 0;
+        itemMap.set(item.name, {
+          count: current.count + 1,
+          totalUsdc: current.totalUsdc + itemPrice,
+        });
+      }
+    }
+  }
+
+  const topSellingItems = Array.from(itemMap.entries())
+    .map(([name, stat]) => ({ name, ...stat }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return {
+    totalRevenueUsdc,
+    todayRevenueUsdc,
+    totalTransactionsCount: txs.length,
+    topSellingItems,
+  };
+}
+
 export async function findTransactionByNonce(
   nonce: string
 ): Promise<Transaction | null> {

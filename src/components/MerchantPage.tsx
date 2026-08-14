@@ -15,10 +15,12 @@ import {
   clearCart,
   getTransactions,
   getIncomingTransactions,
+  getMerchantInflowStats,
   subscribeToTransactions,
   type CatalogItem,
   type CartItem,
   type Transaction,
+  type MerchantInflowStats,
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
 import {  
@@ -46,6 +48,13 @@ import {
   Pencil,
   RefreshCcw,
   QrCode,
+  TrendingUp,
+  ChevronRight,
+  Edit2,
+  BarChart3,
+  Calendar,
+  Activity,
+  ChevronDown
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -91,6 +100,11 @@ export default function MerchantPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [qrTotal, setQrTotal] = useState(0);
   const [qrNonce, setQrNonce] = useState("");
+
+  // Inflow Stats state
+  const [inflowStats, setInflowStats] = useState<MerchantInflowStats | null>(null);
+  const [inflowLoading, setInflowLoading] = useState(false);
+  const [showInflow, setShowInflow] = useState(true);
   const [error, setError] = useState("");
 
   // History state
@@ -105,16 +119,31 @@ export default function MerchantPage() {
   const [rateSource, setRateSource] = useState<"coingecko" | "fallback">(() => getCachedRate().source as "coingecko" | "fallback");
 
   // Load data on wallet connect
+  async function loadInflowStats() {
+    if (!address) return;
+    setInflowLoading(true);
+    try {
+      const stats = await getMerchantInflowStats(address);
+      setInflowStats(stats);
+    } catch (err) {
+      console.error("Failed to load inflow stats:", err);
+    } finally {
+      setInflowLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!address) return;
     loadCatalog();
     loadCart();
     loadHistory();
+    loadInflowStats();
     // NOTE: loadIncoming() is intentionally NOT called on mount — the banner
     // shows only NEW payments arriving via realtime, not historical ones.
     const unsub = subscribeToTransactions(() => {
       loadHistory();
       loadIncoming();
+      loadInflowStats();
     });
     return () => unsub();
   }, [address]);
@@ -377,19 +406,86 @@ console.error("Failed to load cart:", err);
                 {t("merchant.desc")}
               </p>
             </div>
-            {history.length > 0 && (
-              <a
-                href={`${ARC_EXPLORER_URL}/address/${address}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-ink-line/40 px-4 py-2 text-sm text-text-muted transition-colors hover:bg-ink-2 hover:text-text"
-              >
-                {t("merchant.viewAllTx")} <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
           </div>
 
-        {/* Incoming payment banner (auto-detected) */}
+          {/* Merchant Inflow Stats Summary */}
+          {inflowStats && (
+            <div className="mb-8 rounded-2xl border border-primary/20 bg-card/40 p-5 backdrop-blur-sm shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-base font-bold text-text">Ringkasan Omset Merchant</h2>
+                    <p className="text-xs text-text-muted">Statistik pendapatan terisolasi per wallet</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowInflow(!showInflow)}
+                  className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text transition-colors"
+                >
+                  {showInflow ? "Sembunyikan" : "Tampilkan"}
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", showInflow && "rotate-180")} />
+                </button>
+              </div>
+
+              {showInflow && (
+                <div className="space-y-4 pt-2 border-t border-border/40">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-xl border border-border/50 bg-background/50 p-3.5">
+                      <div className="flex items-center gap-1.5 text-xs text-text-muted mb-1">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Total Omset
+                      </div>
+                      <p className="text-lg font-bold text-text font-mono">
+                        {inflowStats.totalRevenueUsdc.toFixed(2)} <span className="text-xs text-primary font-sans font-normal">USDC</span>
+                      </p>
+                      <p className="text-[10px] text-text-muted mt-0.5">
+                        ≈ {formatCurrency(convertFromUsdc(inflowStats.totalRevenueUsdc, currencyMode, allRates), currencyMode)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border/50 bg-background/50 p-3.5">
+                      <div className="flex items-center gap-1.5 text-xs text-text-muted mb-1">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500" /> Omset Hari Ini
+                      </div>
+                      <p className="text-lg font-bold text-text font-mono">
+                        {inflowStats.todayRevenueUsdc.toFixed(2)} <span className="text-xs text-primary font-sans font-normal">USDC</span>
+                      </p>
+                      <p className="text-[10px] text-text-muted mt-0.5">
+                        ≈ {formatCurrency(convertFromUsdc(inflowStats.todayRevenueUsdc, currencyMode, allRates), currencyMode)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border/50 bg-background/50 p-3.5">
+                      <div className="flex items-center gap-1.5 text-xs text-text-muted mb-1">
+                        <Activity className="w-3.5 h-3.5 text-amber-500" /> Total Transaksi Masuk
+                      </div>
+                      <p className="text-lg font-bold text-text font-mono">
+                        {inflowStats.totalTransactionsCount} <span className="text-xs text-text-muted font-sans font-normal">transaksi</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {inflowStats.topSellingItems.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-xs font-semibold text-text-muted mb-2">Item Terlaris:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {inflowStats.topSellingItems.map((item, idx) => (
+                          <div key={idx} className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-background/30 px-3 py-1.5 text-xs">
+                            <span className="font-medium text-text">{item.name}</span>
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">{item.count}x ter-checkout</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Incoming payment banner (auto-detected) */}
         {incoming.length > 0 && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-stamp-green/30 bg-stamp-green/5 px-4 py-3 text-sm">
             <span className="relative flex h-2.5 w-2.5 shrink-0">
