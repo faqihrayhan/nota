@@ -47,12 +47,12 @@ function formatUSDC(amount: string | number): string {
   return num.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function decodeQR(raw: string): { payerAddress: string; totalAmount: string; items: { name: string; price: number }[]; category: string; timestamp: number; expiresAt: number; nonce: string } | null {
-  try {
-    return JSON.parse(atob(raw));
-  } catch {
-    return null;
-  }
+import { decodeAndVerifyQR, type QRPayload } from "@/lib/qr-hmac";
+
+interface ScannedState {
+  payload: QRPayload;
+  isValidSignature: boolean;
+  isLegacyUnsigned: boolean;
 }
 
 function resolveProvider(walletId: string) {
@@ -89,7 +89,7 @@ function PaymentPageInner() {
   const { t } = useLanguage();
 
   const [scanInput, setScanInput] = useState("");
-  const [scannedData, setScannedData] = useState<ReturnType<typeof decodeQR>>(null);
+  const [scannedData, setScannedData] = useState<ScannedState | null>(null);
   const [transferring, setTransferring] = useState(false);
   const [successTx, setSuccessTx] = useState<Transaction | null>(null);
   const [error, setError] = useState("");
@@ -127,14 +127,14 @@ const unsub = subscribeToTransactions(() => loadHistory());
     }
   }
 
-  const handleScan = useCallback(() => {
+  const handleScan = useCallback(async () => {
     if (!scanInput.trim()) return;
     try {
-      const decoded = decodeQR(scanInput.trim());
-      if (decoded && Date.now() <= decoded.expiresAt) {
-        setScannedData(decoded);
+      const { payload, isValidSignature, isLegacyUnsigned } = await decodeAndVerifyQR(scanInput.trim());
+      if (payload && Date.now() <= payload.expiresAt) {
+        setScannedData({ payload, isValidSignature, isLegacyUnsigned });
         setError("");
-      } else if (decoded) {
+      } else if (payload) {
         setError(t("payment.error.qrExpired"));
       } else {
         setError(t("payment.error.invalidQR"));
@@ -148,13 +148,13 @@ const unsub = subscribeToTransactions(() => loadHistory());
     (data: string) => {
       setScanInput(data);
       setCameraOpen(false);
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const decoded = decodeQR(data.trim());
-          if (decoded && Date.now() <= decoded.expiresAt) {
-            setScannedData(decoded);
+          const { payload, isValidSignature, isLegacyUnsigned } = await decodeAndVerifyQR(data.trim());
+          if (payload && Date.now() <= payload.expiresAt) {
+            setScannedData({ payload, isValidSignature, isLegacyUnsigned });
             setError("");
-          } else if (decoded) {
+          } else if (payload) {
             setError(t("payment.error.qrExpired"));
           } else {
             setError(t("payment.error.invalidQR"));
@@ -214,24 +214,34 @@ const unsub = subscribeToTransactions(() => loadHistory());
     setTransferring(true);
     setError("");
     try {
-      const amountInUsdc = parseFloat(scannedData.totalAmount) / 1_000_000;
-      const payeeAddress = scannedData.payerAddress.toLowerCase();
-      const amountInUnits = BigInt(Math.floor(amountInUsdc * 1_000_000));
+      const { payload } = scannedData;
+      const amountInUsdc = parseFloat(payload.totalAmount) / 1_000_000;
+      const payeeAddress = payload.payerAddress.toLowerCase();
+      const amountRaw = BigInt(payload.totalAmount);
 
-      // dataHash = keccak256 of canonical JSON (nonce + payer + payee + amount)
-      // → verifiable accounting: anyone can recompute & verify on-chain
+      const existingTx = await findTransactionByNonce(payload.nonce);
+      if (existingTx) {
+        throw new Error("Transaksi dengan nonce ini sudah pernah diproses.");
+      }
+
+      if (scannedData.isLegacyUnsigned) {
+        console.warn("Processing legacy unsigned QR code");
+      } else if (!scannedData.isValidSignature) {
+        throw new Error("Signature QR tidak valid! Kemungkinan data telah dimodifikasi.");
+      }
+
       const dataHash = await keccak256Hex(JSON.stringify({
-        nonce: scannedData.nonce,
+        nonce: payload.nonce,
         payer: address.toLowerCase(),
         payee: payeeAddress,
-        amount: amountInUnits.toString(),
+        amount: amountRaw.toString(),
       }));
 
       // 1. Approve USDC to invoice manager if needed
-      await ensureAllowance(provider, address, INVOICE_MANAGER_ADDRESS, amountInUnits);
+      await ensureAllowance(provider, address, INVOICE_MANAGER_ADDRESS, amountRaw);
 
       // 2. One-shot: create invoice + pay via contract (verifiable on-chain)
-      const calldata = encodeCreateAndPayInvoice(payeeAddress, amountInUnits, dataHash);
+      const calldata = encodeCreateAndPayInvoice(payeeAddress, amountRaw, dataHash);
 
       const txHash = (await provider.request({
         method: "eth_sendTransaction",
@@ -259,19 +269,19 @@ const unsub = subscribeToTransactions(() => loadHistory());
         payer_address: address.toLowerCase(),
         payee_address: payeeAddress,
         amount: amountInUsdc,
-        category: scannedData.category,
-        items: scannedData.items,
+        category: payload.category,
+        items: payload.items,
         tx_hash: txHash,
         block_hash: receipt?.blockHash ?? "",
         block_number: receipt ? parseInt(receipt.blockNumber, 16) : 0,
         status: "confirmed",
         mode: "payment",
-        nonce: scannedData.nonce,
+        nonce: payload.nonce,
       };
 
       await saveTransaction(tx);
       try {
-        await deductStockAfterPayment(payeeAddress, scannedData.items);
+        await deductStockAfterPayment(payeeAddress, payload.items);
       } catch (stockErr) {
         console.error("Failed to deduct stock:", stockErr);
       }
@@ -320,31 +330,43 @@ const unsub = subscribeToTransactions(() => loadHistory());
 
       {/* Scanned QR confirmation */}
       {scannedData ? (
-        <div className="rounded-2xl border border-accent/40 bg-ink-2/30 p-6">
-          <div className="flex items-center gap-2 text-accent">
-            <CheckCircle2 className="h-5 w-5" />
-            <h3 className="font-display text-lg font-semibold">{t("payment.confirmTitle")}</h3>
-          </div>
-          <div className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-text-muted">{t("payment.from")}</span>
-              <span className="font-mono text-xs">{scannedData.payerAddress.slice(0, 10)}…{scannedData.payerAddress.slice(-8)}</span>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
+              <span className="text-xs text-text-muted">Keamanan Payload QR:</span>
+              {scannedData.isValidSignature ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <CheckCircle2 className="w-3 h-3" /> Verified HMAC
+                </span>
+              ) : scannedData.isLegacyUnsigned ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                  <AlertTriangle className="w-3 h-3" /> Legacy (No Signature)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/20">
+                  <AlertTriangle className="w-3 h-3" /> Tampered / Unverified
+                </span>
+              )}
             </div>
-            <div className="flex justify-between">
-              <span className="text-text-muted">{t("payment.total")}</span>
-              <span className="font-medium">{formatUSDC(parseFloat(scannedData.totalAmount) / 1_000_000)} USDC</span>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted">{t("payment.merchant")}:</span>
+              <span className="font-mono text-xs">{scannedData.payload.payerAddress.slice(0, 10)}…{scannedData.payload.payerAddress.slice(-8)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-text-muted">{t("payment.category")}</span>
-              <span className="capitalize">{scannedData.category}</span>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted">{t("payment.amount")}:</span>
+              <span className="font-medium">{formatUSDC(parseFloat(scannedData.payload.totalAmount) / 1_000_000)} USDC</span>
             </div>
-            {scannedData.items.length > 0 && (
-              <div className="mt-3 rounded-xl border border-ink-line/30 bg-ink p-3">
-                <p className="text-xs text-text-muted mb-2">{t("payment.items")}</p>
-                {scannedData.items.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span className="text-text-muted">{item.name}</span>
-                    <span>{formatUSDC(item.price)}</span>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted">{t("payment.category")}:</span>
+              <span className="capitalize">{scannedData.payload.category}</span>
+            </div>
+            {scannedData.payload.items.length > 0 && (
+              <div className="pt-2 border-t border-border/50">
+                <span className="text-xs text-text-muted block mb-1">{t("payment.items")}:</span>
+                {scannedData.payload.items.map((item: { name: string; price: number }, i: number) => (
+                  <div key={i} className="flex justify-between text-xs py-0.5">
+                    <span>{item.name}</span>
+                    <span className="font-mono">{(item.price / 1_000_000).toFixed(2)} USDC</span>
                   </div>
                 ))}
               </div>

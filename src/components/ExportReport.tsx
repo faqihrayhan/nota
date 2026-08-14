@@ -1,45 +1,33 @@
 "use client";
 
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
-import type { Transaction } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
-import { Download, FileSpreadsheet, Loader2, CheckCircle2 } from "lucide-react";
+import { type Transaction } from "@/lib/supabase";
+import { FileSpreadsheet, Download, Loader2, CheckCircle2, FileText } from "lucide-react";
 
-type StatusFilter = "all" | "confirmed" | "pending" | "failed";
+type StatusFilter = "all" | "confirmed" | "failed";
 
-/**
- * ExportReport — export riwayat transaksi ke CSV (client-side Blob).
- *
- * Keamanan (CSV injection / formula injection):
- * - Setiap cell yang diawali karakter berbahaya (=, +, -, @, tab, CR)
- *   di-prefix dengan apostrof (`'`) supaya tidak dieksekusi sebagai
- *   formula oleh spreadsheet (OWASP CSV Injection).
- * - Cell yang mengandung koma, quote, atau newline dibungkus double-quote.
- */
-function sanitizeCsvCell(value: string | number): string {
-  let str = String(value ?? "");
-  if (/^[=+\-@\t\r]/.test(str)) {
-    str = `'${str}`;
-  }
-  if (/[",\n\r]/.test(str)) {
-    str = `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-function toCsv(rows: (string | number)[][]): string {
-  return rows.map((row) => row.map(sanitizeCsvCell).join(",")).join("\n");
-}
-
-function formatDateTime(iso: string): string {
+function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("id-ID", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    dateStyle: "medium",
+    timeStyle: "short",
   });
+}
+
+function toCsv(rows: any[][]) {
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => {
+          const s = String(cell ?? "").replace(/"/g, '""');
+          return s.includes(",") || s.includes("\n") || s.includes('"') ? `"${s}"` : s;
+        })
+        .join(",")
+    )
+    .join("\n");
 }
 
 export default function ExportReport({
@@ -53,7 +41,8 @@ export default function ExportReport({
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [exporting, setExporting] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [done, setDone] = useState(false);
 
   const filtered = useMemo(() => {
@@ -66,11 +55,13 @@ export default function ExportReport({
     });
   }, [transactions, fromDate, toDate, status]);
 
-  const totalAmount = filtered.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  const totalAmount = useMemo(() => {
+    return filtered.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  }, [filtered]);
 
-  const handleExport = () => {
+  const handleExportCSV = () => {
     if (filtered.length === 0) return;
-    setExporting(true);
+    setExportingCsv(true);
     setDone(false);
 
     try {
@@ -98,7 +89,6 @@ export default function ExportReport({
         tx.payee_address,
       ]);
 
-      // Blob client-side — tidak ada upload ke server.
       const blob = new Blob(["\uFEFF" + toCsv([header, ...rows])], {
         type: "text/csv;charset=utf-8;",
       });
@@ -112,7 +102,55 @@ export default function ExportReport({
       setDone(true);
       setTimeout(() => setDone(false), 3000);
     } finally {
-      setExporting(false);
+      setExportingCsv(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (filtered.length === 0) return;
+    setExportingPdf(true);
+    setDone(false);
+
+    try {
+      const doc = new jsPDF();
+      
+      doc.setFontSize(18);
+      doc.text("Nota — Accounting Report", 14, 22);
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+      doc.text(`Summary: ${filtered.length} transactions, Total: ${totalAmount.toFixed(2)} USDC`, 14, 37);
+
+      const header = [
+        t("export.date"),
+        t("export.category"),
+        t("export.amount"),
+        t("export.status"),
+      ];
+
+      const rows = filtered.map((tx) => [
+        formatDateTime(tx.created_at).split(",")[0],
+        t(`payment.cat.${tx.category}`),
+        `${tx.amount} USDC`,
+        tx.status,
+      ]);
+
+      autoTable(doc, {
+        startY: 45,
+        head: [header],
+        body: rows,
+        theme: "striped",
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+
+      doc.save(`nota-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setDone(true);
+      setTimeout(() => setDone(false), 3000);
+    } catch (err) {
+      console.error("PDF Export error:", err);
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -151,39 +189,51 @@ export default function ExportReport({
           >
             <option value="all">{t("export.statusAll")}</option>
             <option value="confirmed">{t("export.statusConfirmed")}</option>
-            <option value="pending">{t("export.statusPending")}</option>
             <option value="failed">{t("export.statusFailed")}</option>
           </select>
         </label>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-text-muted">
-          {t("export.count")}: <span className="font-mono font-medium text-text">{filtered.length}</span>
-          {" · "}
-          {t("export.total")}:{" "}
-          <span className="font-mono font-medium text-text">
-            {totalAmount.toLocaleString("id-ID", { maximumFractionDigits: 6 })} USDC
-          </span>
-        </p>
-        <button
-          onClick={handleExport}
-          disabled={disabled || exporting || filtered.length === 0}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-white transition-all",
-            "hover:bg-accent-strong hover:shadow-lg hover:shadow-accent/20",
-            "disabled:opacity-60 disabled:cursor-not-allowed"
-          )}
-        >
-          {exporting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : done ? (
-            <CheckCircle2 className="h-4 w-4" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {t("export.download")}
-        </button>
+      <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-ink-line/20 pt-6">
+        <div className="text-sm">
+          <span className="text-text-muted">{t("export.totalMatches")}: </span>
+          <span className="font-bold text-text">{filtered.length}</span>
+          <span className="mx-2 text-ink-line">|</span>
+          <span className="text-text-muted">{t("export.totalAmount")}: </span>
+          <span className="font-bold text-accent">{totalAmount.toFixed(2)} USDC</span>
+        </div>
+
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            onClick={handleExportCSV}
+            disabled={disabled || exportingCsv || exportingPdf || filtered.length === 0}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-sm font-semibold text-bg transition-all hover:opacity-90 disabled:opacity-50"
+          >
+            {exportingCsv ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : done ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            CSV
+          </button>
+          
+          <button
+            onClick={handleExportPDF}
+            disabled={disabled || exportingCsv || exportingPdf || filtered.length === 0}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-ink-line/40 bg-ink-2 px-6 py-2.5 text-sm font-semibold text-text transition-all hover:bg-ink-line/20 disabled:opacity-50"
+          >
+            {exportingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : done ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            PDF
+          </button>
+        </div>
       </div>
     </div>
   );

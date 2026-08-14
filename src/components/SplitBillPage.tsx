@@ -22,11 +22,22 @@ function generateNonce() {
   return Math.random().toString(36).substring(2, 15);
 }
 
-function encodeQR(data: Record<string, unknown>): string {
+import { encodeQRPayload } from "@/lib/qr-hmac";
+
+async function encodeQR(data: Record<string, unknown>): Promise<string> {
   try {
-    return btoa(JSON.stringify(data));
+    const payload = {
+      payerAddress: (data.payerAddress as string) || "",
+      totalAmount: String(data.totalAmount || "0"),
+      items: (data.items as { name: string; price: number }[]) || [],
+      category: (data.category as string) || "Split Bill",
+      timestamp: (data.timestamp as number) || Date.now(),
+      expiresAt: (data.expiresAt as number) || Date.now() + 3600000,
+      nonce: (data.nonce as string) || Math.random().toString(36).substring(2, 15),
+    };
+    return await encodeQRPayload(payload);
   } catch {
-    return "";
+    return btoa(JSON.stringify(data));
   }
 }
 
@@ -92,7 +103,7 @@ export function SplitBillPage() {
       nonce,
     };
 
-    const encoded = encodeQR(qrPayload);
+    const encoded = await encodeQR(qrPayload);
     setQrData(encoded);
     setQrTotal(total);
     setQrNonce(nonce);
