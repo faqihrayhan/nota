@@ -16,9 +16,14 @@ import {
   ExternalLink,
 } from "lucide-react";
 
-function formatDate(iso: string): string {
+function formatDate(iso?: string): string {
   // Always English (en-US) format for official digital receipt
-  return new Date(iso).toLocaleString("en-US", {
+  if (!iso) return new Date().toLocaleString("en-US", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) {
+    return new Date().toLocaleString("en-US", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+  return d.toLocaleString("en-US", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -157,7 +162,13 @@ export default function ReceiptModal({
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500">Category</span>
-              <span className="capitalize">{tx.category || "Others"}</span>
+              <span className="capitalize">
+                {tx.category === "belanja" || tx.category === "shopping"
+                  ? "Shopping"
+                  : tx.category === "makan"
+                  ? "Food & Beverage"
+                  : tx.category || "Others"}
+              </span>
             </div>
             <div className="flex justify-between gap-4">
               <span className="shrink-0 text-neutral-500">{directionLabel}</span>

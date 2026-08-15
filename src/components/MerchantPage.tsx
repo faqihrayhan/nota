@@ -57,6 +57,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { encodeQRPayload } from "@/lib/qr-hmac";
 
 function generateNonce() {
   return Math.random().toString(36).substring(2, 15);
@@ -141,6 +142,7 @@ export default function MerchantPage() {
     // NOTE: loadIncoming() is intentionally NOT called on mount — the banner
     // shows only NEW payments arriving via realtime, not historical ones.
     const unsub = subscribeToTransactions(() => {
+      loadCatalog();
       loadHistory();
       loadIncoming();
       loadInflowStats();
@@ -347,26 +349,27 @@ console.error("Failed to load cart:", err);
   }
 
   // Generate QR from cart
-  function handleGenerateQR() {
+  async function handleGenerateQR() {
     if (cart.length === 0) return;
     const nonce = generateNonce();
     const totalUsdcVal = cartTotalUSDC;
     const itemsForQR = cart.map((item) => ({
       name: item.item_name,
-      price: item.price_usdc,
+      price: Math.round(item.price_usdc * 1_000_000), // convert to USDC units (micro-USDC)
+      qty: item.qty,
     }));
 
     const qrPayload = {
-      payerAddress: address,
+      payerAddress: address || "",
       totalAmount: (totalUsdcVal * 1_000_000).toFixed(0),
       items: itemsForQR,
-      category: "belanja",
+      category: "shopping",
       timestamp: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000,
       nonce,
     };
 
-    const encoded = encodeQR(qrPayload);
+    const encoded = await encodeQRPayload(qrPayload);
     setQrData(encoded);
     setQrNonce(nonce);
     setQrTotal(totalUsdcVal);

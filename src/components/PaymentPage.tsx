@@ -248,15 +248,39 @@ const unsub = subscribeToTransactions(() => loadHistory());
         params: [{ from: address, to: INVOICE_MANAGER_ADDRESS, data: calldata }],
       })) as string;
 
-      // Poll for receipt (instead of fixed 4s sleep): check every 2s, up to 30s.
+      // Poll for receipt: check via provider, with fallback to direct RPC call if provider fails (e.g. rate limit)
       let receipt: { blockHash: string; blockNumber: string; status: string } | null = null;
       const pollStart = Date.now();
+      const officialRpc = "https://rpc.testnet.arc.io";
+
       while (!receipt && Date.now() - pollStart < 30_000) {
         await new Promise((r) => setTimeout(r, 2000));
-        receipt = (await provider.request({
-          method: "eth_getTransactionReceipt",
-          params: [txHash],
-        })) as { blockHash: string; blockNumber: string; status: string } | null;
+        try {
+          receipt = (await provider.request({
+            method: "eth_getTransactionReceipt",
+            params: [txHash],
+          })) as { blockHash: string; blockNumber: string; status: string } | null;
+        } catch (pollErr) {
+          console.warn("Provider receipt poll failed, falling back to official Arc RPC:", pollErr);
+          try {
+            const res = await fetch(officialRpc, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 1,
+                method: "eth_getTransactionReceipt",
+                params: [txHash],
+              }),
+            });
+            const rpcJson = await res.json();
+            if (rpcJson.result) {
+              receipt = rpcJson.result;
+            }
+          } catch (directRpcErr) {
+            console.error("Direct RPC fetch failed:", directRpcErr);
+          }
+        }
       }
 
       const isSuccess = receipt?.status === "0x1";
@@ -264,7 +288,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
         throw new Error(t("payment.error.transferFailed"));
       }
 
-      const tx: Omit<Transaction, "id" | "created_at"> = {
+      const tx: Omit<Transaction, "id" | "created_at"> & { created_at?: string } = {
         wallet_address: address.toLowerCase(),
         payer_address: address.toLowerCase(),
         payee_address: payeeAddress,
@@ -277,6 +301,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
         status: "confirmed",
         mode: "payment",
         nonce: payload.nonce,
+        created_at: new Date().toISOString(),
       };
 
       await saveTransaction(tx);
@@ -333,7 +358,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
-              <span className="text-xs text-text-muted">Keamanan Payload QR:</span>
+              <span className="text-xs text-text-muted">{t("payment.securityPayload") || "QR Payload Security"}:</span>
               {scannedData.isValidSignature ? (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                   <CheckCircle2 className="w-3 h-3" /> Verified HMAC
@@ -349,28 +374,41 @@ const unsub = subscribeToTransactions(() => loadHistory());
               )}
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-text-muted">{t("payment.merchant")}:</span>
+              <span className="text-text-muted">{t("payment.merchantAddress") || t("payment.merchant")}:</span>
               <span className="font-mono text-xs">{scannedData.payload.payerAddress.slice(0, 10)}…{scannedData.payload.payerAddress.slice(-8)}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-text-muted">{t("payment.amount")}:</span>
-              <span className="font-medium">{formatUSDC(parseFloat(scannedData.payload.totalAmount) / 1_000_000)} USDC</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
               <span className="text-text-muted">{t("payment.category")}:</span>
-              <span className="capitalize">{scannedData.payload.category}</span>
+              <span className="capitalize">{scannedData.payload.category === "belanja" ? "Shopping" : scannedData.payload.category}</span>
             </div>
             {scannedData.payload.items.length > 0 && (
               <div className="pt-2 border-t border-border/50">
                 <span className="text-xs text-text-muted block mb-1">{t("payment.items")}:</span>
-                {scannedData.payload.items.map((item: { name: string; price: number }, i: number) => (
-                  <div key={i} className="flex justify-between text-xs py-0.5">
-                    <span>{item.name}</span>
-                    <span className="font-mono">{(item.price / 1_000_000).toFixed(2)} USDC</span>
-                  </div>
-                ))}
+                {scannedData.payload.items.map((item: { name: string; price: number; qty?: number }, i: number) => {
+                  const itemUsdc = item.price > 1000 ? item.price / 1_000_000 : item.price;
+                  const qtyVal = item.qty && item.qty > 0 ? item.qty : 1;
+                  return (
+                    <div key={i} className="flex justify-between items-center text-xs py-1 border-b border-border/30 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-text">{item.name}</span>
+                        {qtyVal > 1 && (
+                          <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent">
+                            x{qtyVal}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono text-text-muted">
+                        {(itemUsdc * qtyVal).toFixed(2)} USDC
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
+            <div className="flex justify-between items-center text-sm pt-2 border-t border-border/50 font-semibold">
+              <span className="text-text">{t("payment.amount")}:</span>
+              <span className="text-accent">{formatUSDC(parseFloat(scannedData.payload.totalAmount) / 1_000_000)} USDC</span>
+            </div>
           </div>
           <div className="mt-6 flex gap-3">
             <button
