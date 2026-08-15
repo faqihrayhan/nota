@@ -61,7 +61,7 @@ export type Transaction = {
   payee_address: string;
   amount: number;
   category: string;
-  items: { name: string; price: number }[];
+  items: { name: string; price: number; qty?: number }[];
   tx_hash: string;
   block_hash: string;
   block_number: number;
@@ -333,11 +333,12 @@ export async function getMerchantInflowStats(
     if (Array.isArray(tx.items)) {
       for (const item of tx.items) {
         if (!item || !item.name) continue;
+        const qty = typeof item.qty === "number" && item.qty > 0 ? item.qty : 1;
         const current = itemMap.get(item.name) || { count: 0, totalUsdc: 0 };
         const itemPrice = typeof item.price === "number" ? (item.price > 1000 ? item.price / 1_000_000 : item.price) : 0;
         itemMap.set(item.name, {
-          count: current.count + 1,
-          totalUsdc: current.totalUsdc + itemPrice,
+          count: current.count + qty,
+          totalUsdc: current.totalUsdc + itemPrice * qty,
         });
       }
     }
