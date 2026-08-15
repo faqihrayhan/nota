@@ -447,7 +447,7 @@ console.error("Failed to load cart:", err);
 
                     <div className="rounded-xl border border-border/50 bg-background/50 p-3.5">
                       <div className="flex items-center gap-1.5 text-xs text-text-muted mb-1">
-                        <Calendar className="w-3.5 h-3.5 text-blue-500" /> Today's Revenue
+                        <Calendar className="w-3.5 h-3.5 text-blue-500" /> Today&apos;s Revenue
                       </div>
                       <p className="text-lg font-bold text-text font-mono">
                         {inflowStats.todayRevenueUsdc.toFixed(2)} <span className="text-xs text-primary font-sans font-normal">USDC</span>
