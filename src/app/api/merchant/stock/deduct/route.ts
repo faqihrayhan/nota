@@ -89,7 +89,10 @@ export async function POST(req: NextRequest) {
   // ── Atomic claim: exactly one caller wins the deduction ──
   const { data: claimed } = await admin
     .from("transactions")
-    .update({ stock_deducted: true, updated_at: new Date().toISOString() })
+    // NOTE: `transactions` has NO `updated_at` column (only created_at,
+    // expires_at). Including it here would make PostgREST fail with
+    // PGRST204 and the claim would always look "already-deducted".
+    .update({ stock_deducted: true })
     .eq("id", tx.id)
     .eq("stock_deducted", false)
     .select("id")
