@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getTransactions, getIncomingTransactions, type Transaction } from "@/lib/supabase";
-import { toFeatureCategory, categoryLabelKey } from "@/lib/category-meta";
+import { toFeatureCategory, categoryLabelKey, FEATURE_CATEGORY_KEYS, type FeatureCategory } from "@/lib/category-meta";
 import { cn } from "@/lib/utils";
 import ReceiptModal from "@/components/ReceiptModal";
 import ExportReport from "@/components/ExportReport";
@@ -100,25 +100,6 @@ export default function AnalisaPage() {
       })
     : [];
 
-  // Feature-based category grouping (payment / merchant_pos / split_bill / receive)
-  const byCategory = filtered.reduce((acc, tx) => {
-    const cat = toFeatureCategory(tx.category);
-    acc[cat] = (acc[cat] || 0) + tx.amount;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const totalSpent = Object.values(byCategory).reduce((a, b) => a + b, 0);
-  const maxCategory = Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0];
-
-  const byDay = filtered.reduce((acc, tx) => {
-    const day = new Date(tx.created_at).toISOString().split("T")[0];
-    acc[day] = (acc[day] || 0) + tx.amount;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const sortedDays = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
-  const maxDayValue = Math.max(...Object.values(byDay), 1);
-
   // ── Cashflow (Phase 5+) ────────────────────────────────────────
   // outflow = transactions where I'm the payer (existing filtered list)
   // inflow  = transactions where I'm the payee (incoming)
@@ -132,11 +113,30 @@ export default function AnalisaPage() {
   const totalOutflow = filtered.reduce((s, t) => s + t.amount, 0);
   const netBalance = totalInflow - totalOutflow;
 
-  // Recent-transactions list respects the inflow/outflow/all scope.
+  // Recent-transactions list & category breakdown respect the inflow/outflow/all scope.
   const outflowScoped = filtered;
   const inflowScoped = inflowFiltered;
   const scopedTxns =
     scope === "inflow" ? inflowScoped : scope === "outflow" ? outflowScoped : [...outflowScoped, ...inflowScoped];
+
+  // Feature-based category grouping (payment / merchant_pos / split_bill / receive)
+  // Evaluated over scopedTxns so selecting Inflow/Outflow/All updates By Category accordingly
+  const byCategory = scopedTxns.reduce((acc, tx) => {
+    const cat = toFeatureCategory(tx.category);
+    acc[cat] = (acc[cat] || 0) + tx.amount;
+    return acc;
+  }, { payment: 0, merchant_pos: 0, split_bill: 0, receive: 0 } as Record<FeatureCategory, number>);
+
+  const totalSpent = Object.values(byCategory).reduce((a, b) => a + b, 0);
+  const maxCategory = Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0];
+
+  const byDay = filtered.reduce((acc, tx) => {
+    const day = new Date(tx.created_at).toISOString().split("T")[0];
+    acc[day] = (acc[day] || 0) + tx.amount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sortedDays = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
 
   // Daily inflow/outflow pairs for the trend chart
   const daySet = new Set([
@@ -183,6 +183,7 @@ export default function AnalisaPage() {
         <p className="mt-2 text-text-muted">{t("analisa.desc")}</p>
       </div>
 
+      {/* Period Selector */}
       <div className="flex gap-2">
         {(["week", "month", "all"] as Period[]).map((p) => (
           <button
@@ -196,28 +197,6 @@ export default function AnalisaPage() {
             )}
           >
             {t(`analisa.period.${p}`)}
-          </button>
-        ))}
-      </div>
-
-      {/* Inflow / Outflow / All toggle */}
-      <div className="mt-3 flex gap-2">
-        {(["inflow", "outflow", "all"] as TxScope[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => setScope(s)}
-            className={cn(
-              "rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200",
-              scope === s
-                ? s === "inflow"
-                  ? "bg-stamp-green text-white"
-                  : s === "outflow"
-                    ? "bg-warn-amber text-white"
-                    : "bg-accent text-white"
-                : "border border-ink-line/40 text-text-muted hover:text-text hover:bg-ink-2"
-            )}
-          >
-            {t(`analisa.scope.${s}`)}
           </button>
         ))}
       </div>
@@ -381,32 +360,55 @@ export default function AnalisaPage() {
           <ExportReport transactions={isConnected ? transactions : []} disabled={!isConnected} />
 
           <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
-            <h3 className="font-display text-sm font-semibold">{t("analisa.byCategory")}</h3>
-            <div className="mt-4 space-y-3">
-              {Object.entries(byCategory)
-                .sort((a, b) => b[1] - a[1])
-                .map(([cat, amount]) => {
-                  const pct = totalSpent > 0 ? (amount / totalSpent) * 100 : 0;
-                  return (
-                    <div key={cat}>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2">
-                          <span className={cn("h-2.5 w-2.5 rounded-full", CATEGORY_COLORS[cat] || "bg-text-muted")} />
-                          {t(categoryLabelKey(cat))}
-                        </span>
-                        <span className="font-mono">
-                          {formatUSDC(amount)} USDC ({pct.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <div className="mt-1.5 h-2 w-full rounded-full bg-ink-2 overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full transition-all duration-500", CATEGORY_COLORS[cat] || "bg-text-muted")}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="font-display text-sm font-semibold">{t("analisa.byCategory")}</h3>
+              {/* Inflow / Outflow / All scope toggle inside By Category card */}
+              <div className="flex gap-1 rounded-xl border border-ink-line/40 bg-ink-2/50 p-1">
+                {(["inflow", "outflow", "all"] as TxScope[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setScope(s)}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200",
+                      scope === s
+                        ? s === "inflow"
+                          ? "bg-stamp-green text-white shadow-sm"
+                          : s === "outflow"
+                            ? "bg-warn-amber text-white shadow-sm"
+                            : "bg-accent text-white shadow-sm"
+                        : "text-text-muted hover:text-text hover:bg-ink-line/20"
+                    )}
+                  >
+                    {t(`analisa.scope.${s}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-3">
+              {FEATURE_CATEGORY_KEYS.map((cat) => {
+                const amount = byCategory[cat] || 0;
+                const totalScopeSum = Object.values(byCategory).reduce((a, b) => a + b, 0);
+                const pct = totalScopeSum > 0 ? (amount / totalScopeSum) * 100 : 0;
+                return (
+                  <div key={cat}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className={cn("h-2.5 w-2.5 rounded-full", CATEGORY_COLORS[cat] || "bg-text-muted")} />
+                        {t(categoryLabelKey(cat))}
+                      </span>
+                      <span className="font-mono">
+                        {formatUSDC(amount)} USDC ({pct.toFixed(1)}%)
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="mt-1.5 h-2 w-full rounded-full bg-ink-2 overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-500", CATEGORY_COLORS[cat] || "bg-text-muted")}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

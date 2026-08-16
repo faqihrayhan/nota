@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { toFeatureCategory } from "./category-meta";
 
 /**
  * Supabase client factory (Phase 5 — Payment Hardening).
@@ -321,7 +322,9 @@ export interface MerchantInflowStats {
 export async function getMerchantInflowStats(
   payeeAddress: string
 ): Promise<MerchantInflowStats> {
-  const txs = await getIncomingTransactions(payeeAddress, 500);
+  // Only count merchant_pos transactions (filter out split_bill & generic incoming)
+  const allTxs = await getIncomingTransactions(payeeAddress, 500);
+  const txs = allTxs.filter((tx) => toFeatureCategory(tx.category) === "merchant_pos");
 
   let totalRevenueUsdc = 0;
   let todayRevenueUsdc = 0;
