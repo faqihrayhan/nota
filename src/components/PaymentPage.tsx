@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -21,6 +21,7 @@ import {
 } from "@/lib/supabase";
 import { ARC_EXPLORER_URL } from "@/lib/arc-chain";
 import { type CurrencyCode, CURRENCY_SYMBOLS, fetchLiveRates, convertFromUsdc, formatCurrency } from "@/lib/exchange-rate";
+import { categoryLabelKey } from "@/lib/category-meta";
 import { QRScanner } from "@/components/QRScanner";
 import ReceiptModal from "@/components/ReceiptModal";
 import { cn } from "@/lib/utils";
@@ -305,6 +306,10 @@ const unsub = subscribeToTransactions(() => loadHistory());
       };
 
       await saveTransaction(tx);
+      // Stock deduction now happens server-side (service-role) so merchant
+      // stock is updated even though the payer's JWT cannot update the
+      // merchant's rows under RLS. The nonce lets the route claim once.
+      (window as unknown as { __lastNonce?: string }).__lastNonce = payload.nonce;
       try {
         await deductStockAfterPayment(payeeAddress, payload.items);
       } catch (stockErr) {
@@ -379,7 +384,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-text-muted">{t("payment.category")}:</span>
-              <span className="capitalize">{scannedData.payload.category === "belanja" ? "Shopping" : scannedData.payload.category}</span>
+              <span className="capitalize">{t(categoryLabelKey(scannedData.payload.category))}</span>
             </div>
             {scannedData.payload.items.length > 0 && (
               <div className="pt-2 border-t border-border/50">

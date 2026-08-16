@@ -1,0 +1,52 @@
+// ─── Feature-based category meta ─────────────────────────────────────────
+// Nota groups analytics by FEATURE rather than shopping-style categories:
+//   merchant_pos  — POS merchant QR payments (MerchantPage)
+//   split_bill    — Split Bill QR payments (SplitBillPage)
+//   payment       — direct / generic Scan&Pay payments (incl. legacy rows)
+//   receive       — incoming transfers (payee) not matched above
+//
+// Legacy category values (shopping-style) are mapped into the new feature
+// buckets so historical rows keep showing up with a translated label.
+
+export type FeatureCategory = "payment" | "merchant_pos" | "split_bill" | "receive";
+
+const LEGACY_TO_FEATURE: Record<string, FeatureCategory> = {
+  belanja: "merchant_pos",
+  shopping: "merchant_pos",
+  split: "split_bill",
+  split_bill: "split_bill",
+  makan: "payment",
+  transport: "payment",
+  hiburan: "payment",
+  kesehatan: "payment",
+  lainnya: "payment",
+  lain: "payment",
+  other: "payment",
+};
+
+export function toFeatureCategory(category: string | null | undefined): FeatureCategory {
+  const raw = (category || "payment").toLowerCase().trim();
+  if (LEGACY_TO_FEATURE[raw]) return LEGACY_TO_FEATURE[raw];
+  if (
+    raw === "payment" ||
+    raw === "merchant" ||
+    raw === "merchant_pos" ||
+    raw === "pos" ||
+    raw === "receive" ||
+    raw === "incoming"
+  ) {
+    return raw === "merchant" || raw === "pos" ? "merchant_pos" : raw === "incoming" || raw === "receive" ? "receive" : "payment";
+  }
+  return "payment";
+}
+
+export const FEATURE_CATEGORY_KEYS: FeatureCategory[] = [
+  "payment",
+  "merchant_pos",
+  "split_bill",
+  "receive",
+];
+
+export function categoryLabelKey(category: string | null | undefined): string {
+  return `category.feature.${toFeatureCategory(category)}`;
+}
