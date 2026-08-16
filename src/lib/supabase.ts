@@ -161,26 +161,33 @@ export async function deleteCatalogItem(id: string): Promise<void> {
 export async function deductStockAfterPayment(
   merchantAddress: string,
   items: { name: string; price: number; qty?: number }[]
-): Promise<void> {
-  const client = getAuthedClient();
-  const normalizedMerchant = merchantAddress.toLowerCase();
+): Promise<{ ok: boolean; skipped?: boolean }> {
+  // NOTE (server-side fix): client-side deduction is no longer used for RLS
+  // correctness — see /api/merchant/stock/deduct. We KEEP this function only
+  // as a lightweight fallback for demo/self-pay where the merchant wallet is
+  // also the payer (RLS owner update still works in that case).
+  try {
+    const token = getAuthToken();
+    if (!token) return { ok: false };
 
-  for (const item of items) {
-    const qtyToDed = item.qty || 1;
-    const { data: catalogItem } = await client
-      .from("merchant_catalog")
-      .select("id, stock")
-      .eq("wallet_address", normalizedMerchant)
-      .ilike("name", item.name)
-      .maybeSingle();
-
-    if (catalogItem && catalogItem.stock != null) {
-      const newStock = Math.max(0, Number(catalogItem.stock) - qtyToDed);
-      await client
-        .from("merchant_catalog")
-        .update({ stock: newStock, updated_at: new Date().toISOString() })
-        .eq("id", catalogItem.id);
-    }
+    const res = await fetch("/api/merchant/stock/deduct", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        payeeAddress: merchantAddress,
+        nonce: (window as unknown as { __lastNonce?: string }).__lastNonce || "",
+        items,
+      }),
+    });
+    const json = (await res.json()) as { ok?: boolean; skipped?: boolean };
+    if (!res.ok) return { ok: false };
+    return { ok: json.ok !== false, skipped: json.skipped === true };
+  } catch (err) {
+    console.error("Failed to deduct stock via server:", err);
+    return { ok: false };
   }
 }
 

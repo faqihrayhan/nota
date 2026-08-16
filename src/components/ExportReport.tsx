@@ -6,6 +6,7 @@ import autoTable from "jspdf-autotable";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { type Transaction } from "@/lib/supabase";
+import { toFeatureCategory, categoryLabelKey } from "@/lib/category-meta";
 import { FileSpreadsheet, Download, Loader2, CheckCircle2, FileText } from "lucide-react";
 
 type StatusFilter = "all" | "confirmed" | "failed";
@@ -80,7 +81,7 @@ export default function ExportReport({
       const rows = filtered.map((tx) => [
         formatDateTime(tx.created_at),
         tx.tx_hash,
-        t(`payment.cat.${tx.category}`),
+        t(categoryLabelKey(tx.category)),
         tx.items?.map((i) => i.name).join("; ") || "",
         tx.amount,
         tx.status,
@@ -131,7 +132,7 @@ export default function ExportReport({
 
       const rows = filtered.map((tx) => [
         formatDateTime(tx.created_at).split(",")[0],
-        t(`payment.cat.${tx.category}`),
+        t(categoryLabelKey(tx.category)),
         `${tx.amount} USDC`,
         tx.status,
       ]);

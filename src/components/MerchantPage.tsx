@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -112,6 +112,10 @@ export default function MerchantPage() {
   const [history, setHistory] = useState<Transaction[]>([]);
   // Incoming payments (payee = me) — only NEW payments via realtime (not history)
   const [incoming, setIncoming] = useState<Transaction[]>([]);
+  // Latest confirmed payment detected in realtime → drives the success UI
+  const [paidTx, setPaidTx] = useState<Transaction | null>(null);
+  // Nonces already shown this session (prevents duplicate banners/modals)
+  const seenNoncesRef = useRef<Set<string>>(new Set());
 
   // Live IDR⇄USDC rate (fetched from CoinGecko; falls back offline)
   const [rate, setRate] = useState<ExchangeRate>(() => getCachedRate());
@@ -227,6 +231,20 @@ console.error("Failed to load cart:", err);
     try {
       const txs = await getIncomingTransactions(address);
       setIncoming(txs);
+      // A payment that arrived via realtime gets surfaced as a success UI.
+      // We track nonces already shown this session so the banner/modal only
+      // fires ONCE per payment (and not for historical rows on mount).
+      const fresh = txs.filter((tx) => {
+        if (tx.status !== "confirmed") return false;
+        if (tx.nonce && seenNoncesRef.current.has(tx.nonce)) return false;
+        return true;
+      });
+      for (const tx of fresh) {
+        if (tx.nonce) seenNoncesRef.current.add(tx.nonce);
+      }
+      if (fresh.length > 0) {
+        setPaidTx(fresh[0]);
+      }
     } catch (err) {
       console.error("Failed to load incoming payments:", err);
     }
@@ -363,7 +381,7 @@ console.error("Failed to load cart:", err);
       payerAddress: address || "",
       totalAmount: (totalUsdcVal * 1_000_000).toFixed(0),
       items: itemsForQR,
-      category: "shopping",
+      category: "merchant_pos",
       timestamp: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000,
       nonce,
@@ -920,6 +938,84 @@ console.error("Failed to load cart:", err);
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ══ Realtime payment success (auto-detected) ══ */}
+        {paidTx && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-stamp-green/50 bg-ink p-6 shadow-2xl">
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-stamp-green/15">
+                  <CheckCircle2 className="h-7 w-7 text-stamp-green" />
+                </div>
+                <button
+                  onClick={() => setPaidTx(null)}
+                  className="rounded-xl p-1.5 text-text-muted hover:bg-ink-line/40 hover:text-text"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <h3 className="mt-4 font-display text-xl font-bold text-stamp-green">
+                {t("merchant.paidSuccessTitle")}
+              </h3>
+              <p className="mt-1 text-sm text-text-muted">{t("merchant.paidSuccessDesc")}</p>
+
+              <div className="mt-5 space-y-2.5 rounded-xl border border-ink-line/30 bg-ink-2/40 p-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-text-muted">{t("merchant.amount")}</span>
+                  <span className="font-mono font-semibold text-stamp-green">
+                    +{formatUSDC(paidTx.amount)} USDC
+                  </span>
+                </div>
+                {Array.isArray(paidTx.items) && paidTx.items.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">{t("merchant.itemsInPayment")}</span>
+                    <span className="text-text">
+                      {paidTx.items
+                        .map((it: { name: string; qty?: number }) => `${it.name}${it.qty && it.qty > 1 ? ` ×${it.qty}` : ""}`)
+                        .join(", ")}
+                    </span>
+                  </div>
+                )}
+                {paidTx.tx_hash && (
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">{t("merchant.txHash")}</span>
+                    <a
+                      href={`https://testnet.arcscan.app/tx/${paidTx.tx_hash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-xs text-accent hover:text-accent-strong"
+                    >
+                      {paidTx.tx_hash.slice(0, 10)}…{paidTx.tx_hash.slice(-8)}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={() => setPaidTx(null)}
+                  className="flex-1 rounded-xl bg-stamp-green px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-stamp-green/90"
+                >
+                  {t("merchant.continue")}
+                </button>
+                <button
+                  onClick={() => {
+                    setPaidTx(null);
+                    clearCart(address || "");
+                    loadCart();
+                    loadCatalog();
+                    loadHistory();
+                    setQrData(null);
+                  }}
+                  className="flex-1 rounded-xl border border-ink-line/40 px-4 py-3 text-sm text-text-muted transition-all hover:bg-ink-2 hover:text-text"
+                >
+                  {t("merchant.newOrder")}
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -97,7 +97,7 @@ export function SplitBillPage() {
       items: participants
         .filter((p) => p.amount > 0)
         .map((p) => ({ name: p.name.trim() || "Participant", price: p.amount })),
-      category: "split",
+      category: "split_bill",
       timestamp: Date.now(),
       expiresAt: Date.now() + 10 * 60 * 1000,
       nonce,
