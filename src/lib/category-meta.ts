@@ -27,15 +27,14 @@ const LEGACY_TO_FEATURE: Record<string, FeatureCategory> = {
 export function toFeatureCategory(category: string | null | undefined): FeatureCategory {
   const raw = (category || "payment").toLowerCase().trim();
   if (LEGACY_TO_FEATURE[raw]) return LEGACY_TO_FEATURE[raw];
-  if (
-    raw === "payment" ||
-    raw === "merchant" ||
-    raw === "merchant_pos" ||
-    raw === "pos" ||
-    raw === "receive" ||
-    raw === "incoming"
-  ) {
-    return raw === "merchant" || raw === "pos" ? "merchant_pos" : raw === "incoming" || raw === "receive" ? "receive" : "payment";
+  if (raw === "merchant_pos" || raw === "merchant" || raw === "pos") {
+    return "merchant_pos";
+  }
+  if (raw === "split_bill" || raw === "split") {
+    return "split_bill";
+  }
+  if (raw === "receive" || raw === "incoming") {
+    return "receive";
   }
   return "payment";
 }
