@@ -438,15 +438,15 @@ console.error("Failed to load cart:", err);
                     <BarChart3 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="font-display text-base font-bold text-text">Merchant Revenue Summary</h2>
-                    <p className="text-xs text-text-muted">Isolated income statistics per wallet</p>
+                    <h2 className="font-display text-base font-bold text-text">{t("merchant.revenueSummary")}</h2>
+                    <p className="text-xs text-text-muted">{t("merchant.revenueDesc")}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowInflow(!showInflow)}
                   className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text transition-colors"
                 >
-                  {showInflow ? "Hide" : "Show"}
+                  {showInflow ? t("merchant.hide") : t("merchant.show")}
                   <ChevronDown className={cn("w-4 h-4 transition-transform", showInflow && "rotate-180")} />
                 </button>
               </div>
@@ -456,7 +456,7 @@ console.error("Failed to load cart:", err);
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="rounded-xl border border-border/50 bg-background/50 p-3.5">
                       <div className="flex items-center gap-1.5 text-xs text-text-muted mb-1">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Total Revenue
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> {t("merchant.totalRevenue")}
                       </div>
                       <p className="text-lg font-bold text-text font-mono">
                         {inflowStats.totalRevenueUsdc.toFixed(2)} <span className="text-xs text-primary font-sans font-normal">USDC</span>
@@ -468,7 +468,7 @@ console.error("Failed to load cart:", err);
 
                     <div className="rounded-xl border border-border/50 bg-background/50 p-3.5">
                       <div className="flex items-center gap-1.5 text-xs text-text-muted mb-1">
-                        <Calendar className="w-3.5 h-3.5 text-blue-500" /> Today&apos;s Revenue
+                        <Calendar className="w-3.5 h-3.5 text-blue-500" /> {t("merchant.todayRevenue")}
                       </div>
                       <p className="text-lg font-bold text-text font-mono">
                         {inflowStats.todayRevenueUsdc.toFixed(2)} <span className="text-xs text-primary font-sans font-normal">USDC</span>
@@ -480,22 +480,22 @@ console.error("Failed to load cart:", err);
 
                     <div className="rounded-xl border border-border/50 bg-background/50 p-3.5">
                       <div className="flex items-center gap-1.5 text-xs text-text-muted mb-1">
-                        <Activity className="w-3.5 h-3.5 text-amber-500" /> Total Incoming Tx
+                        <Activity className="w-3.5 h-3.5 text-amber-500" /> {t("merchant.totalIncomingTx")}
                       </div>
                       <p className="text-lg font-bold text-text font-mono">
-                        {inflowStats.totalTransactionsCount} <span className="text-xs text-text-muted font-sans font-normal">txs</span>
+                        {inflowStats.totalTransactionsCount} <span className="text-xs text-text-muted font-sans font-normal">{t("merchant.txs")}</span>
                       </p>
                     </div>
                   </div>
 
                   {inflowStats.topSellingItems.length > 0 && (
                     <div className="pt-2">
-                      <p className="text-xs font-semibold text-text-muted mb-2">Top Selling Items:</p>
+                      <p className="text-xs font-semibold text-text-muted mb-2">{t("merchant.topSellingItems")}</p>
                       <div className="flex flex-wrap gap-2">
                         {inflowStats.topSellingItems.map((item, idx) => (
                           <div key={idx} className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-background/30 px-3 py-1.5 text-xs">
                             <span className="font-medium text-text">{item.name}</span>
-                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">{item.count}x sold</span>
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">{item.count}x {t("merchant.sold")}</span>
                           </div>
                         ))}
                       </div>
