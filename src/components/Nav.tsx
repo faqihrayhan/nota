@@ -52,7 +52,7 @@ export function Nav() {
     { icon: BarChart3, title: t("nav.analisa"), desc: "Financial Analysis", href: "/analisa" },
     { icon: TrendingUp, title: t("nav.forecast"), desc: "AI Forecasting", href: "/forecast" },
     { icon: Layers, title: t("nav.split-bill") , desc: "Split Your Payment", href: "/split-bill" },
-    { icon: HelpCircle, title: t("nav.score"), desc: "On-chain score", href: "/score" },
+    { icon: HelpCircle, title: t("nav.score"), desc: "Coming Soon", href: "/score" },
   ];
 
   const docsItems = [
