@@ -8,6 +8,7 @@ export interface QRPayload {
   totalAmount: string;
   items: { name: string; price: number }[];
   category: string;
+  splitId?: number; // Present for split_bill: on-chain split ID to pay via paySplit()
   timestamp: number;
   expiresAt: number;
   nonce: string;
