@@ -161,9 +161,9 @@
   "payment.cat.hiburan": "Hiburan",
   "payment.cat.kesehatan": "Kesehatan",
   "payment.cat.lainnya": "Lainnya",
-  "analisa.eyebrow": "Analisa Keuangan",
-  "analisa.title": "Ke Mana Uangmu Pergi?",
-  "analisa.desc": "Ringkasan pengeluaran berdasarkan nota-nota on-chain-mu.",
+  "analisa.eyebrow": "Analisis Arus Kas",
+  "analisa.title": "Dasbor Arus Kas",
+  "analisa.desc": "Pantau pemasukan, pengeluaran, dan saldo bersih on-chain-mu.",
   "analisa.period.week": "Minggu",
   "analisa.period.month": "Bulan",
   "analisa.period.all": "Semua",
@@ -351,5 +351,10 @@
   "hero.verified": "Terverifikasi On-Chain",
   "hero.instantSettlement": "Settlement Instan",
   "hero.receiptAlt": "Nota Receipt Hero",
-  "payment.error.contractNotDeployed": "Kontrak belum di-deploy. Coba lagi nanti."
+  "payment.error.contractNotDeployed": "Kontrak belum di-deploy. Coba lagi nanti.",
+  "payment.scanButton": "Pindai QR",
+  "payment.cat.shopping": "Belanja",
+  "export.totalMatches": "Total cocok",
+  "export.totalAmount": "Total jumlah",
+  "merchant.refreshCatalog": "Muat ulang katalog & sinkronkan stok"
 }

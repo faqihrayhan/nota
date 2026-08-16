@@ -517,6 +517,14 @@ console.error("Failed to load cart:", err);
                 <div className="flex items-center gap-2">
                   <Package className="h-5 w-5 text-primary" />
                   <h2 className="font-display text-lg font-semibold">{t("merchant.catalog")}</h2>
+                  <button
+                    onClick={() => loadCatalog()}
+                    disabled={catalogLoading}
+                    title={t("merchant.refreshCatalog")}
+                    className="ml-1 inline-flex items-center justify-center rounded-lg border border-ink-line/40 p-1.5 text-text-muted transition-all hover:border-primary/50 hover:text-primary disabled:opacity-50"
+                  >
+                    <RefreshCcw className={cn("h-3.5 w-3.5", catalogLoading && "animate-spin")} />
+                  </button>
                 </div>
                 <button
                   onClick={() => setIsAdding(!isAdding)}

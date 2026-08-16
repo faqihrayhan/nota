@@ -186,12 +186,16 @@ export default function ReceiptModal({
                 Items
               </p>
               <div className="space-y-1">
-                {tx.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span>{item.name}</span>
-                    <span className="font-mono">{formatUSDC(item.price)} USDC</span>
-                  </div>
-                ))}
+                {tx.items.map((item, idx) => {
+                  const itemUsdc = item.price > 1000 ? item.price / 1_000_000 : item.price;
+                  const qtyVal = item.qty && item.qty > 0 ? item.qty : 1;
+                  return (
+                    <div key={idx} className="flex justify-between">
+                      <span>{item.name}{qtyVal > 1 ? ` ×${qtyVal}` : ""}</span>
+                      <span className="font-mono">{formatUSDC(itemUsdc * qtyVal)} USDC</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
