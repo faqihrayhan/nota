@@ -6,6 +6,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import {
   INVOICE_MANAGER_ADDRESS,
   encodeCreateAndPayInvoice,
+  encodePaySplit,
   encodeApprove,
   encodeAllowance,
   keccak256Hex,
@@ -241,8 +242,15 @@ const unsub = subscribeToTransactions(() => loadHistory());
       // 1. Approve USDC to invoice manager if needed
       await ensureAllowance(provider, address, INVOICE_MANAGER_ADDRESS, amountRaw);
 
-      // 2. One-shot: create invoice + pay via contract (verifiable on-chain)
-      const calldata = encodeCreateAndPayInvoice(payeeAddress, amountRaw, dataHash);
+      // 2. Choose payment path:
+      //    - split_bill + splitId → paySplit(splitId) on-chain (participant settles share)
+      //    - otherwise → createAndPayInvoice (one-shot create + pay)
+      let calldata: string;
+      if (payload.category === "split_bill" && typeof payload.splitId === "number" && payload.splitId > 0) {
+        calldata = encodePaySplit(payload.splitId);
+      } else {
+        calldata = encodeCreateAndPayInvoice(payeeAddress, amountRaw, dataHash);
+      }
 
       const txHash = (await provider.request({
         method: "eth_sendTransaction",
@@ -306,14 +314,19 @@ const unsub = subscribeToTransactions(() => loadHistory());
       };
 
       await saveTransaction(tx);
-      // Stock deduction now happens server-side (service-role) so merchant
-      // stock is updated even though the payer's JWT cannot update the
-      // merchant's rows under RLS. The nonce lets the route claim once.
-      (window as unknown as { __lastNonce?: string }).__lastNonce = payload.nonce;
-      try {
-        await deductStockAfterPayment(payeeAddress, payload.items);
-      } catch (stockErr) {
-        console.error("Failed to deduct stock:", stockErr);
+      // Stock deduction is ONLY for merchant POS. Split-bill payments are
+      // settled fully on-chain via paySplit — they must NOT deduct merchant stock.
+      const isMerchantPos = payload.category !== "split_bill";
+      if (isMerchantPos) {
+        // Stock deduction now happens server-side (service-role) so merchant
+        // stock is updated even though the payer's JWT cannot update the
+        // merchant's rows under RLS. The nonce lets the route claim once.
+        (window as unknown as { __lastNonce?: string }).__lastNonce = payload.nonce;
+        try {
+          await deductStockAfterPayment(payeeAddress, payload.items);
+        } catch (stockErr) {
+          console.error("Failed to deduct stock:", stockErr);
+        }
       }
       await loadHistory();
       setSuccessTx(tx as Transaction);

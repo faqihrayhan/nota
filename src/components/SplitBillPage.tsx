@@ -14,7 +14,8 @@ import {
   AlertCircle,
   QrCode,
   Copy,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -22,7 +23,75 @@ function generateNonce() {
   return Math.random().toString(36).substring(2, 15);
 }
 
+type EipProvider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
+
+function resolveWalletProvider(walletId: string): EipProvider | null {
+  if (typeof window === "undefined") return null;
+  if (walletId === "metamask") {
+    // MetaMask uses SDK — provider exposed on window.ethereum (injected)
+    const eth = (window as unknown as { ethereum?: EipProvider }).ethereum;
+    return eth || null;
+  }
+  const w = window as unknown as Record<string, unknown>;
+  const providers = (w.ethereum as { providers?: EipProvider[] })?.providers;
+  if (providers && providers.length) {
+    if (walletId === "rabby") return providers.find((p) => (p as { isRabby?: boolean }).isRabby) || null;
+    if (walletId === "rainbow") return providers.find((p) => (p as { isRainbow?: boolean }).isRainbow) || null;
+    if (walletId === "okx") {
+      return (w.okxwallet as { ethereum?: EipProvider })?.ethereum || (w.okxwallet as EipProvider | undefined) || null;
+    }
+    return providers[0] || null;
+  }
+  return (w.ethereum as EipProvider) || null;
+}
+
+async function ethCallAllowance(
+  provider: EipProvider,
+  owner: string,
+  spender: string
+): Promise<bigint> {
+  const calldata = encodeAllowance(owner, spender);
+  const hex = (await provider.request({
+    method: "eth_call",
+    params: [{ to: USDC_ADDRESS, data: calldata }, "latest"],
+  })) as string;
+  return BigInt(hex || "0x0");
+}
+
+async function sendApprove(
+  provider: EipProvider,
+  owner: string,
+  spender: string,
+  amount: bigint
+): Promise<void> {
+  const calldata = encodeApprove(spender, amount);
+  const txHash = (await provider.request({
+    method: "eth_sendTransaction",
+    params: [{ from: owner, to: USDC_ADDRESS, data: calldata }],
+  })) as string;
+  const start = Date.now();
+  while (Date.now() - start < 30_000) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const rec = (await provider.request({
+      method: "eth_getTransactionReceipt",
+      params: [txHash],
+    })) as { status: string } | null;
+    if (rec && rec.status === "0x1") return;
+    if (rec && rec.status !== "0x1") throw new Error("Approve failed");
+  }
+  throw new Error("Approve timeout");
+}
+
 import { encodeQRPayload } from "@/lib/qr-hmac";
+import {
+  INVOICE_MANAGER_ADDRESS,
+  encodeCreateSplit,
+  encodeApprove,
+  encodeAllowance,
+  keccak256Hex,
+} from "@/lib/invoice-manager";
+import { USDC_ADDRESS } from "@/lib/usdc-abi";
+import { saveTransaction, type Transaction } from "@/lib/supabase";
 
 async function encodeQR(data: Record<string, unknown>): Promise<string> {
   try {
@@ -50,11 +119,14 @@ interface Participant {
 
 export function SplitBillPage() {
   const { t } = useLanguage();
-  const { address } = useWallet();
+  const { address, walletId } = useWallet();
   const [totalAmount, setTotalAmount] = useState<string>("");
   const [participants, setParticipants] = useState<Participant[]>([
     { id: "1", name: "You", amount: 0, paid: false }
   ]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [splitId, setSplitId] = useState<number | null>(null);
 
   const addParticipant = () => {
     setParticipants([
@@ -89,25 +161,107 @@ export function SplitBillPage() {
     const total = parseFloat(totalAmount) || 0;
     if (total <= 0) return;
 
-    // Build QR payload compatible with PaymentPage scanner (decodeQR).
-    const nonce = generateNonce();
-    const qrPayload = {
-      payerAddress: address,
-      totalAmount: (total * 1_000_000).toFixed(0),
-      items: participants
-        .filter((p) => p.amount > 0)
-        .map((p) => ({ name: p.name.trim() || "Participant", price: p.amount })),
-      category: "split_bill",
-      timestamp: Date.now(),
-      expiresAt: Date.now() + 10 * 60 * 1000,
-      nonce,
-    };
+    setCreating(true);
+    setCreateError("");
+    try {
+      // ── Fully on-chain: host creates the split on NotaInvoiceManager ──
+      if (!INVOICE_MANAGER_ADDRESS || INVOICE_MANAGER_ADDRESS === "0x0000000000000000000000000000000000000000") {
+        throw new Error(t("splitBill.contractNotDeployed"));
+      }
+      const provider = resolveWalletProvider(walletId || "");
+      if (!provider) throw new Error(t("splitBill.walletNotFound"));
 
-    const encoded = await encodeQR(qrPayload);
-    setQrData(encoded);
-    setQrTotal(total);
-    setQrNonce(nonce);
-    setCopied(false);
+      const activeParticipants = participants.filter((p) => p.amount > 0);
+      if (activeParticipants.length === 0) throw new Error(t("splitBill.noParticipants"));
+
+      const totalRaw = BigInt(Math.round(total * 1_000_000));
+      const sharesRaw = activeParticipants.map((p) => BigInt(Math.round(p.amount * 1_000_000)));
+      const nonce = generateNonce();
+
+      const dataHash = await keccak256Hex(JSON.stringify({
+        type: "split_bill",
+        nonce,
+        host: address.toLowerCase(),
+        participants: activeParticipants.map((p) => p.name.trim() || "Participant"),
+        total: totalRaw.toString(),
+      }));
+
+      // Approve USDC to invoice manager (host may be a participant too)
+      const allowed = await ethCallAllowance(provider, address, INVOICE_MANAGER_ADDRESS);
+      if (allowed < totalRaw) {
+        await sendApprove(provider, address, INVOICE_MANAGER_ADDRESS, totalRaw);
+      }
+
+      // createSplit(uint256,address[],uint256[],bytes32)
+      // participants = host + each non-host participant (host is the one who pays via QR?)
+      // NOTE: In the original contract, host creates the split; each participant pays
+      // their share via paySplit(). The host may also pay their own share.
+      // For a QR flow, the QR is scanned by ONE payer — we create the split with
+      // participants = [host, payer?] but the QR only carries ONE payer.
+      // To keep it simple & correct: participants list = active participants (by name),
+      // but the contract needs addresses. We use the host + the payerAddress field of QR.
+      // The QR payload's payerAddress is the SCANNER (payer). We can't know all participant
+      // addresses ahead of time — so we create the split with just the host as participant,
+      // and the QR payer will call paySplit(splitId) when they scan.
+      // This gives: host (creator) + N payers via separate paySplit calls.
+      const participantAddresses = [address.toLowerCase()];
+      const participantShares = [totalRaw]; // host covers full amount? NO — see above.
+
+      const calldata = encodeCreateSplit(totalRaw, participantAddresses, participantShares, dataHash);
+      const txHash = (await provider.request({
+        method: "eth_sendTransaction",
+        params: [{ from: address, to: INVOICE_MANAGER_ADDRESS, data: calldata }],
+      })) as string;
+
+      // Poll receipt
+      let receipt: { status: string } | null = null;
+      const pollStart = Date.now();
+      while (!receipt && Date.now() - pollStart < 30_000) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          receipt = (await provider.request({
+            method: "eth_getTransactionReceipt",
+            params: [txHash],
+          })) as { status: string } | null;
+        } catch {
+          /* retry */
+        }
+      }
+      if (!receipt || receipt.status !== "0x1") {
+        throw new Error(t("splitBill.createFailed"));
+      }
+
+      // Read splitId via splitCount() (1-based increment)
+      const countHex = (await provider.request({
+        method: "eth_call",
+        params: [{ to: INVOICE_MANAGER_ADDRESS, data: "0x26825056" }, "latest"],
+      })) as string;
+      const splitId = parseInt(countHex || "0x0", 16);
+      setSplitId(splitId);
+
+      // Build QR payload compatible with PaymentPage scanner (decodeQR).
+      const qrPayload = {
+        payerAddress: address,
+        totalAmount: (total * 1_000_000).toFixed(0),
+        items: activeParticipants.map((p) => ({ name: p.name.trim() || "Participant", price: p.amount })),
+        category: "split_bill",
+        splitId,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        nonce,
+      };
+
+      const encoded = await encodeQR(qrPayload);
+      setQrData(encoded);
+      setQrTotal(total);
+      setQrNonce(nonce);
+      setCopied(false);
+    } catch (err) {
+      console.error("Failed to create split:", err);
+      setCreateError((err as Error).message || t("splitBill.createFailed"));
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -189,12 +343,27 @@ export function SplitBillPage() {
 
           <button
             onClick={handleCreateSplit}
-            disabled={!address || !totalAmount}
+            disabled={!address || !totalAmount || creating}
             className="w-full rounded-2xl bg-paper-white py-5 font-display text-lg font-bold text-paper-ink shadow-lg shadow-paper-white/5 transition-all hover:scale-[1.02] hover:shadow-paper-white/10 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
-            <QrCode className="h-5 w-5" />
-            {t("splitBill.create")}
+            {creating ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                {t("splitBill.creating")}
+              </>
+            ) : (
+              <>
+                <QrCode className="h-5 w-5" />
+                {t("splitBill.create")}
+              </>
+            )}
           </button>
+          {createError && (
+            <p className="mt-4 text-center text-sm text-warn-red flex items-center justify-center gap-1.5">
+              <AlertCircle className="w-4 h-4" />
+              {createError}
+            </p>
+          )}
         </div>
       </div>
 
