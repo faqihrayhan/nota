@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getTransactions, getIncomingTransactions, type Transaction } from "@/lib/supabase";
-import { toFeatureCategory, categoryLabelKey, FEATURE_CATEGORY_KEYS, type FeatureCategory } from "@/lib/category-meta";
+import { categoryLabelKey, getEffectiveCategory, FEATURE_CATEGORY_KEYS, type FeatureCategory } from "@/lib/category-meta";
 import { cn } from "@/lib/utils";
 import ReceiptModal from "@/components/ReceiptModal";
 import ExportReport from "@/components/ExportReport";
@@ -120,9 +120,9 @@ export default function AnalisaPage() {
     scope === "inflow" ? inflowScoped : scope === "outflow" ? outflowScoped : [...outflowScoped, ...inflowScoped];
 
   // Feature-based category grouping (payment / merchant_pos / split_bill / receive)
-  // Evaluated over scopedTxns so selecting Inflow/Outflow/All updates By Category accordingly
+  // Evaluated over scopedTxns using getEffectiveCategory so payer perspective shows "payment"
   const byCategory = scopedTxns.reduce((acc, tx) => {
-    const cat = toFeatureCategory(tx.category);
+    const cat = getEffectiveCategory(tx, currentAddr);
     acc[cat] = (acc[cat] || 0) + tx.amount;
     return acc;
   }, { payment: 0, merchant_pos: 0, split_bill: 0, receive: 0 } as Record<FeatureCategory, number>);
@@ -385,7 +385,11 @@ export default function AnalisaPage() {
               </div>
             </div>
             <div className="space-y-3">
-              {FEATURE_CATEGORY_KEYS.map((cat) => {
+              {FEATURE_CATEGORY_KEYS.filter((cat) => {
+                if (scope === "outflow") return cat === "payment" || cat === "split_bill";
+                if (scope === "inflow") return cat === "merchant_pos" || cat === "split_bill" || cat === "receive";
+                return (byCategory[cat] || 0) > 0 || cat === "payment" || cat === "merchant_pos";
+              }).map((cat) => {
                 const amount = byCategory[cat] || 0;
                 const totalScopeSum = Object.values(byCategory).reduce((a, b) => a + b, 0);
                 const pct = totalScopeSum > 0 ? (amount / totalScopeSum) * 100 : 0;
@@ -418,7 +422,7 @@ export default function AnalisaPage() {
               {scopedTxns.slice(0, 10).map((tx) => {
                 const isExpanded = expandedTx === tx.id;
                 const isOut = tx.payer_address.toLowerCase() === currentAddr;
-                const featCat = toFeatureCategory(tx.category);
+                const featCat = getEffectiveCategory(tx, currentAddr);
                 return (
                   <div
                     key={tx.id}
@@ -431,7 +435,7 @@ export default function AnalisaPage() {
                           <Receipt className="h-4 w-4 text-text" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{t(categoryLabelKey(tx.category))}</p>
+                          <p className="text-sm font-medium">{t(`category.feature.${featCat}`)}</p>
                           <p className="text-xs text-text-faint font-mono">{formatDate(tx.created_at)}</p>
                         </div>
                       </div>

@@ -50,3 +50,26 @@ export const FEATURE_CATEGORY_KEYS: FeatureCategory[] = [
 export function categoryLabelKey(category: string | null | undefined): string {
   return `category.feature.${toFeatureCategory(category)}`;
 }
+
+/**
+ * Returns the effective feature category based on whether the user is payer or payee.
+ * - Payer (outflow): Merchant POS payments are shown as "payment" (Pembayaran).
+ * - Payee (inflow): Merchant POS payments are shown as "merchant_pos" (Merchant POS).
+ */
+export function getEffectiveCategory(
+  tx: { category?: string | null; payer_address: string; payee_address: string },
+  userAddr: string
+): FeatureCategory {
+  const feat = toFeatureCategory(tx.category);
+  const isPayer = tx.payer_address.toLowerCase() === userAddr.toLowerCase();
+
+  if (isPayer) {
+    if (feat === "merchant_pos") return "payment";
+    if (feat === "split_bill") return "split_bill";
+    return "payment";
+  } else {
+    if (feat === "merchant_pos") return "merchant_pos";
+    if (feat === "split_bill") return "split_bill";
+    return "receive";
+  }
+}
