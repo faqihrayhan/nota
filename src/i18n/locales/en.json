@@ -161,9 +161,9 @@
   "payment.cat.hiburan": "Entertainment",
   "payment.cat.kesehatan": "Health",
   "payment.cat.lainnya": "Others",
-  "analisa.eyebrow": "Financial Analysis",
-  "analisa.title": "Where Did Your Money Go?",
-  "analisa.desc": "Spending summary based on your on-chain notes.",
+  "analisa.eyebrow": "Cashflow Analysis",
+  "analisa.title": "Cashflow Dashboard",
+  "analisa.desc": "Track your income, spending, and net balance on-chain.",
   "analisa.period.week": "Week",
   "analisa.period.month": "Month",
   "analisa.period.all": "All",
@@ -351,5 +351,10 @@
   "hero.verified": "Verified On-Chain",
   "hero.instantSettlement": "Instant Settlement",
   "hero.receiptAlt": "Nota Receipt Hero",
-  "payment.error.contractNotDeployed": "Contract not deployed yet. Please try again later."
+  "payment.error.contractNotDeployed": "Contract not deployed yet. Please try again later.",
+  "payment.scanButton": "Scan QR",
+  "payment.cat.shopping": "Shopping",
+  "export.totalMatches": "Total matches",
+  "export.totalAmount": "Total amount",
+  "merchant.refreshCatalog": "Refresh catalog & sync stock"
 }

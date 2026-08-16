@@ -199,7 +199,7 @@ export default function AnalisaPage() {
           <Loader2 className="h-5 w-5 animate-spin" />
           {t("analisa.loading")}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && inflowFiltered.length === 0 ? (
         <div className="mt-12 rounded-2xl border border-ink-line/40 bg-ink-2/20 p-12 text-center">
           <Receipt className="mx-auto h-12 w-12 text-text-faint" />
           <h3 className="mt-4 font-display text-lg font-semibold">{t("analisa.emptyTitle")}</h3>
@@ -416,12 +416,16 @@ export default function AnalisaPage() {
                           <div>
                             <p className="font-medium text-text-muted mb-1.5">{t("analisa.itemDetails")}</p>
                             <div className="space-y-1">
-                              {tx.items.map((item, idx) => (
-                                <div key={idx} className="flex justify-between text-text-muted">
-                                  <span>• {item.name}</span>
-                                  <span className="font-mono">{formatUSDC(item.price)} USDC</span>
-                                </div>
-                              ))}
+                              {tx.items.map((item, idx) => {
+                                const itemUsdc = item.price > 1000 ? item.price / 1_000_000 : item.price;
+                                const qtyVal = item.qty && item.qty > 0 ? item.qty : 1;
+                                return (
+                                  <div key={idx} className="flex justify-between text-text-muted">
+                                    <span>• {item.name}{qtyVal > 1 ? ` ×${qtyVal}` : ""}</span>
+                                    <span className="font-mono">{formatUSDC(itemUsdc * qtyVal)} USDC</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
