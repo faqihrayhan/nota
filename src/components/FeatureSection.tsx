@@ -71,7 +71,7 @@ const PILARS = [
     bgColor: "bg-purple-400/10",
     borderColor: "border-purple-400/20",
     href: "/score",
-    active: true,
+    active: false,
   },
 ];
 
