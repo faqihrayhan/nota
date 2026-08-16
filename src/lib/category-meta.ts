@@ -54,10 +54,11 @@ export function categoryLabelKey(category: string | null | undefined): string {
 /**
  * Returns the effective feature category based on whether the user is payer or payee.
  * - Payer (outflow): Merchant POS payments are shown as "payment" (Pembayaran).
- * - Payee (inflow): Merchant POS payments are shown as "merchant_pos" (Merchant POS).
+ * - Payee (inflow): Payments with items or merchant_pos category are shown as "merchant_pos" (Merchant POS).
+ *                   Generic incoming transfers without items are shown as "receive" (Terima).
  */
 export function getEffectiveCategory(
-  tx: { category?: string | null; payer_address: string; payee_address: string },
+  tx: { category?: string | null; items?: unknown[] | null; payer_address: string; payee_address: string },
   userAddr: string
 ): FeatureCategory {
   const feat = toFeatureCategory(tx.category);
@@ -68,8 +69,11 @@ export function getEffectiveCategory(
     if (feat === "split_bill") return "split_bill";
     return "payment";
   } else {
-    if (feat === "merchant_pos") return "merchant_pos";
     if (feat === "split_bill") return "split_bill";
+    // If it has merchant items or is category merchant_pos/belanja/shopping -> merchant_pos
+    if (feat === "merchant_pos" || (Array.isArray(tx.items) && tx.items.length > 0)) {
+      return "merchant_pos";
+    }
     return "receive";
   }
 }
