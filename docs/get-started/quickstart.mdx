@@ -67,7 +67,32 @@ Before using Nota, ensure you have:
 ---
 
 ### 6. Cashflow Analytics & AI Insights (`/analisa` & `/forecast`)
-1. Open **Analisa** to view your merchant financial dashboard:
-   - **Inflow vs Outflow**: Visual trend charts of total incoming USDC revenue versus outgoing expenses.
-   - **Settlement Velocity**: Average time taken for customer payments to clear on Arc Network.
-2. Open **Forecast** for AI-driven revenue predictions based on historical transaction data on-chain.
+
+1. Open **Analisa** to view your financial dashboard:
+   - **Inflow vs Outflow totals**: Total USDC received into your wallet versus total USDC spent from it, plus net balance for the selected period.
+   - **Cashflow trend**: Daily inflow (green) versus outflow (amber).
+   - **Settlement velocity**: Average time customer payments take to clear on Arc Network.
+
+2. **Scope toggle (Inflow / Outflow / All).** Inside the **By Category** card, switch the scope to filter both the category breakdown and the recent-transactions list:
+   - **Inflow** — only transactions where you are the payee.
+   - **Outflow** — only transactions where you are the payer.
+   - **All** — both sides combined.
+
+   Recent transactions render with ArcScan-style signed amounts: `+` in green for inflow, `−` in amber for outflow.
+
+3. **Four feature-based categories.** Analisa groups transactions by the Nota feature that produced them, not by shopping tags. The four categories are:
+   - **Payment** — direct or generic Scan & Pay payments you sent.
+   - **Merchant POS** — payments settled through a merchant storefront QR (with catalog items).
+   - **Split Bill** — payments settled through a Split Bill QR or link.
+   - **Receive** — incoming transfers to your wallet that aren't tagged as POS or Split Bill.
+
+   Legacy shopping-style tags (for example `belanja`, `makan`, `transport`) are mapped into these four buckets so historical rows still show a consistent label.
+
+4. **How each payment is classified.** The category shown depends on which side of the transaction you're on, so the payer and payee never double-count the same payment:
+   - A **Merchant POS** payment (Scan & Pay against a merchant QR with items) shows as **Payment** in your outflow when you're the buyer, and as **Merchant POS** in the merchant's inflow.
+   - A **Split Bill** payment shows as **Split Bill** for both the payer and the payee.
+   - A **generic Scan & Pay** transfer (no catalog items) shows as **Payment** for the payer and **Receive** for the payee.
+
+5. **Exports.** Click **Export CSV** or **Export PDF** to download the current view. Rows use the same feature category labels (Payment, Merchant POS, Split Bill, Receive) as the dashboard, so exports match what you see in Analisa.
+
+6. Open **Forecast** for AI-driven revenue predictions based on your on-chain transaction history.
