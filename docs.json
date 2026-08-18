@@ -36,7 +36,8 @@
             "group": "Smart Contracts",
             "pages": [
               "docs/smart-contracts/uups-architecture",
-              "docs/smart-contracts/data-hash"
+              "docs/smart-contracts/data-hash",
+              "docs/smart-contracts/split-bill"
             ]
           }
         ]
