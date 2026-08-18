@@ -1,0 +1,169 @@
+---
+title: "Split Bill Contract Methods"
+description: "On-chain split bill lifecycle on NotaInvoiceManager: createSplit, paySplit, and completeSplit"
+---
+
+# Split Bill Contract Methods
+
+Split bills in Nota are settled fully on-chain by `NotaInvoiceManager`. A host opens the split, each participant pays their own share directly to the host in USDC, and the host closes the split when everyone has paid. The contract exposes three methods and emits two events that together describe the full lifecycle.
+
+Use these methods when you want to coordinate a group payment where each participant signs their own settlement transaction, and every share is independently verifiable on ArcScan.
+
+---
+
+## 1. Lifecycle overview
+
+```
+  host                                participants                    host
+   │                                       │                            │
+   ▼                                       ▼                            ▼
+createSplit ──► SplitCreated       paySplit ──► SplitMemberPaid    completeSplit
+   │                                       │                            │
+   │      Split is open for payment        │       All shares paid      │
+   └───────────────────────────────────────┴────────────────────────────┘
+```
+
+1. The host calls `createSplit`. The contract assigns an incrementing `splitId` (readable via `splitCount()`) and stores the participant list, their shares, and the `dataHash`.
+2. Each participant calls `paySplit(id)`. USDC is transferred directly from the participant to the host.
+3. Once all participants have paid, the host calls `completeSplit(id)` to lock the split.
+
+All USDC amounts are in **micro-USDC** (`uint256`, 6 decimals). All calls require the caller to have first approved `NotaInvoiceManager` as a spender on the USDC contract for at least their share.
+
+---
+
+## 2. `createSplit`
+
+Opens a new split bill. Only the caller (the "host") can later mark it complete.
+
+```solidity
+function createSplit(
+    uint256 _totalAmount,
+    address[] calldata _participants,
+    uint256[] calldata _shares,
+    bytes32 _dataHash
+) external returns (uint256 splitId);
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `_totalAmount` | `uint256` | Total bill amount in micro-USDC. Stored on the split for reference. |
+| `_participants` | `address[]` | Wallet addresses allowed to call `paySplit` for this split. |
+| `_shares` | `uint256[]` | Per-participant share in micro-USDC. Must be the same length as `_participants`. |
+| `_dataHash` | `bytes32` | Keccak-256 anchor over the off-chain payload (type, nonce, host, participant names, total). Ties the on-chain split to a specific off-chain description. See [Data Hash Protocol](/docs/smart-contracts/data-hash). |
+
+### Behavior
+
+- Reverts with `"Mismatched arrays"` if `_participants.length != _shares.length`.
+- Emits `SplitCreated(id, host, _totalAmount, _dataHash)`.
+- Returns the new `splitId`. Clients can also read `splitCount()` after the receipt to recover the id.
+
+### Client example
+
+```ts
+// Amounts are micro-USDC (6 decimals).
+const totalRaw = BigInt(Math.round(total * 1_000_000));
+const shares = participants.map((p) => BigInt(Math.round(p.amount * 1_000_000)));
+
+// Anchor the off-chain payload the QR carries.
+const dataHash = await keccak256Hex(JSON.stringify({
+  type: "split_bill",
+  nonce,
+  host: hostAddress.toLowerCase(),
+  participants: participants.map((p) => p.name),
+  total: totalRaw.toString(),
+}));
+
+// Approve NotaInvoiceManager once, then create the split.
+await ensureAllowance(provider, hostAddress, INVOICE_MANAGER_ADDRESS, totalRaw);
+const calldata = encodeCreateSplit(totalRaw, participantAddresses, shares, dataHash);
+await provider.request({
+  method: "eth_sendTransaction",
+  params: [{ from: hostAddress, to: INVOICE_MANAGER_ADDRESS, data: calldata }],
+});
+```
+
+---
+
+## 3. `paySplit`
+
+Called by a participant to settle their share.
+
+```solidity
+function paySplit(uint256 _id) external;
+```
+
+### Behavior
+
+- Reverts with `"Split completed"` if the host has already called `completeSplit`.
+- Reverts with `"Not a participant"` if `msg.sender` was not included in `_participants`.
+- Reverts with `"Already paid share"` if this participant has already paid.
+- Reverts with `"Transfer failed"` if `USDC.transferFrom(msg.sender, host, share)` fails. The participant must have approved `NotaInvoiceManager` for at least their share on the USDC contract.
+- Emits `SplitMemberPaid(id, participant, share)`.
+
+USDC is transferred directly from the participant to the host, so each share is verifiable independently on-chain.
+
+### Client example
+
+```ts
+// The QR carries `splitId`. Approve USDC for at least the participant's share, then pay.
+await ensureAllowance(provider, payer, INVOICE_MANAGER_ADDRESS, shareRaw);
+const calldata = encodePaySplit(splitId);
+await provider.request({
+  method: "eth_sendTransaction",
+  params: [{ from: payer, to: INVOICE_MANAGER_ADDRESS, data: calldata }],
+});
+```
+
+---
+
+## 4. `completeSplit`
+
+Marks a split as settled. Only the host can call it.
+
+```solidity
+function completeSplit(uint256 _id) external;
+```
+
+### Behavior
+
+- Reverts with `"Not the host"` if `msg.sender` is not the address that called `createSplit`.
+- Reverts with `"Already completed"` if the split is already closed.
+- Sets `completed = true`, which blocks any further `paySplit` calls for that id.
+
+The host typically calls this after confirming every participant's `SplitMemberPaid` event has landed. Completion is a state flag; USDC has already moved during each `paySplit`, so `completeSplit` does not transfer funds.
+
+---
+
+## 5. Events
+
+```solidity
+event SplitCreated(
+    uint256 indexed id,
+    address indexed host,
+    uint256 totalAmount,
+    bytes32 dataHash
+);
+
+event SplitMemberPaid(
+    uint256 indexed id,
+    address indexed participant,
+    uint256 amount
+);
+```
+
+- `SplitCreated` — emitted once per split, at `createSplit`.
+- `SplitMemberPaid` — emitted once per participant, at each successful `paySplit`.
+
+Both `id`, `host`, and `participant` are indexed, so ArcScan and RPC log filters can query a full split's history by `id`, all splits hosted by an address, or every share paid by a participant.
+
+---
+
+## 6. View helper
+
+```solidity
+function splitCount() external view returns (uint256);
+```
+
+`splitCount()` returns the number of splits that have been created. Because ids are assigned via `++splitCount`, reading this value immediately after a successful `createSplit` receipt yields the new split's `splitId`. Nota uses this to embed the `splitId` in the shared QR without parsing event logs.

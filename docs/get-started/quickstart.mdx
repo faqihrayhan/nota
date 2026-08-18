@@ -58,11 +58,19 @@ Before using Nota, ensure you have:
 ---
 
 ### 5. Split Bill Payments (`/split-bill`)
+
+Split bills are settled fully on-chain through the `NotaInvoiceManager` contract. The host opens a split, each participant pays their share, and the host closes it out.
+
 1. Navigate to **Split Bill**.
-2. Enter the total bill amount and add participants' wallet addresses/names.
-3. Nota calculates equal or custom itemized splits in USDC.
-4. Share the generated **Split QR / Link** with your group.
-5. Track real-time settlement status as each member pays their portion.
+2. Enter the total bill amount and add each participant with their share in USDC.
+3. Click **Create Split**. Your wallet signs two transactions:
+   - `approve` on USDC for the total amount (skipped if the allowance is already sufficient).
+   - `createSplit(totalAmount, participants, shares, dataHash)` on `NotaInvoiceManager`. Amounts are sent in micro-USDC (6 decimals). The `dataHash` is a `keccak256` of the canonical split payload (type, nonce, host, participant names, total) and anchors the off-chain metadata to the on-chain record.
+4. Once the transaction is mined, Nota reads the new `splitId` from `splitCount()` and generates a QR / link that embeds it.
+5. Share the QR with your group. When a participant scans and pays, their wallet calls `paySplit(splitId)`, which transfers their share of USDC directly to the host and emits `SplitMemberPaid`.
+6. After every participant has paid, the host clicks **Complete Split** to call `completeSplit(splitId)`. The split is marked settled and can no longer accept payments.
+
+Each step emits an event you can verify on ArcScan: `SplitCreated` for the host's transaction and `SplitMemberPaid` for each participant. See [Split Bill Contract Methods](/docs/smart-contracts/split-bill) for the full method signatures.
 
 ---
 
