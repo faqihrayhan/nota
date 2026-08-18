@@ -4,3 +4,6 @@ cache/
 .forge-build/
 .env
 lcov.info
+
+# Foundry broadcast artifacts (deployment receipts, never commit)
+broadcast/
