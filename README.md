@@ -40,8 +40,12 @@ live.
 - **EIP-1193 wallet integration** custom provider abstraction (MetaMask via
   `@metamask/sdk`, OKX, Rabby, Rainbow)
 - **USDC payments** direct ERC-20 `transferFrom` calldata against Arc's native USDC
-- **Supabase (Postgres)** catalog, cart, and transaction storage with Row Level
-  Security enabled; `localStorage` fallback for wallet/language persistence
+- **NotaInvoiceManager (Solidity)** UUPS-upgradeable smart contract — on-chain
+  invoice creation, payment, split bill, and `dataHash` anchoring. Built with
+  Foundry + OpenZeppelin Contracts Upgradeable
+- **Supabase (Postgres)** catalog, cart, and transaction storage with per-wallet Row
+  Level Security; wallet auth via challenge/sign JWT flow; `localStorage` fallback
+  for wallet/language persistence
 - **QR** `qrcode.react` (generate) + `html5-qrcode` (scan camera)
 - **Receipt export** `jspdf` + `html-to-image` (PDF download)
 - **i18n** custom ID/EN dictionary (`src/i18n/`)
@@ -77,8 +81,8 @@ live.
 
 ```bash
 # 1. Clone
-git clone https://github.com/faqihrayhan/arc-nota.git
-cd arc-nota
+git clone https://github.com/faqihrayhan/nota.git
+cd nota
 
 # 2. Install dependencies
 npm install
@@ -116,6 +120,7 @@ errors, no lint errors, no commit.
 src/
 ├── app/          # Routing & layouts (Next.js App Router)
 │   ├── page.tsx          # Landing page
+│   ├── api/auth/         # Wallet auth endpoints (challenge + verify)
 │   ├── payment/          # Scan & Pay
 │   ├── merchant/         # Merchant POS
 │   ├── analisa/          # Spending insights
@@ -123,8 +128,9 @@ src/
 │   ├── score/            # Nota Score
 │   └── split-bill/       # Split bill
 ├── components/   # UI components (MerchantPage, PaymentPage, QRScanner, ReceiptModal…)
+│   └── analytics/        # Analytics widgets (CategoryDonut, MetricCard, RevenueChart)
 ├── context/      # React Context (WalletContext, LanguageContext)
-├── lib/          # Config & helpers (arc-chain, usdc-abi, supabase, exchange-rate)
+├── lib/          # Config & helpers (arc-chain, usdc-abi, invoice-manager, qr-hmac, supabase, exchange-rate)
 └── i18n/         # ID/EN translation dictionaries
 ```
 
@@ -134,6 +140,8 @@ src/
 |---|---|
 | `src/lib/arc-chain.ts` | Arc Testnet chain config (EIP-3085 params, explorer URL) |
 | `src/lib/usdc-abi.ts` | USDC ERC-20 ABI + contract address |
+| `src/lib/invoice-manager.ts` | `NotaInvoiceManager` proxy address, function selectors, ABI encoding helpers |
+| `src/lib/qr-hmac.ts` | QR payload HMAC signing & verification (keccak-256) |
 | `src/lib/supabase.ts` | Typed Supabase data layer (catalog, cart, transactions) |
 | `src/lib/exchange-rate.ts` | Live CoinGecko USDC/IDR rate with fallback |
 | `src/context/WalletContext.tsx` | EIP-1193 provider abstraction & wallet state |
@@ -143,15 +151,18 @@ src/
 
 ## 🔒 Security & Data Model
 
-- **Row Level Security (RLS)** is enabled on `transactions`, `merchant_catalog`, and
-  `merchant_cart` tables in Supabase.
+- **Per-wallet Row Level Security (RLS)** is enforced on `transactions`,
+  `merchant_catalog`, and `merchant_cart` tables in Supabase. Each wallet can only
+  read/write its own data; catalog items are publicly readable but owner-writable.
+- **Wallet authentication** uses a challenge/sign flow: the server issues a random
+  nonce, the wallet signs it, and the server returns a JWT with a `wallet_address`
+  claim used by all RLS policies.
+- **QR payload signing** — every payment QR includes a keccak-256 HMAC; the scanner
+  verifies it before processing (anti-tamper, anti-phishing).
 - Prices are stored natively in **USDC** (`price_usdc`), with IDR conversion handled at
   display time using the live CoinGecko rate (fallback `16200` IDR/USDC if the API is
   unreachable).
 - Transaction IDs are server-generated UUIDs (`gen_random_uuid()` default).
-
-> **Note:** Current RLS policies are permissive (`USING (true)`) for development.
-> Per-wallet hardening (Phase 5) is on the roadmap see below.
 
 ---
 
@@ -166,11 +177,13 @@ src/
 - [x] Supabase persistence with RLS enabled
 
 ### v2 Payment Hardening & On-Chain Invoices
-- [ ] **Phase 5 Payment Hardening**: per-wallet RLS policies (private catalog/cart,
-      own-transactions-only), QR payload signing & validation (anti-tamper, anti-phishing)
-- [ ] **Phase 6 Smart Contract Core**: deploy `NotaInvoiceManager.sol` on Arc Testnet
-      on-chain invoice registry/escrow (`createInvoice` / `payInvoice`), Supabase as an
-      indexer of contract events
+- [x] **Phase 5 Payment Hardening**: per-wallet RLS policies (private catalog/cart,
+      own-transactions-only), wallet auth (challenge/sign JWT), QR payload HMAC
+      signing & validation (anti-tamper, anti-phishing)
+- [x] **Phase 6 Smart Contract Core**: `NotaInvoiceManager.sol` (UUPS proxy) deployed
+      on Arc Testnet — on-chain invoice create & pay (`createAndPayInvoice`), split
+      bill (`createSplit` / `paySplit` / `completeSplit`), `dataHash` anchoring,
+      rich events. Supabase as indexer of contract events
 - [ ] **Phase 7 Nota Score v2**: incorporate on-chain verified payment history
       (cryptographically valid, not just DB entries)
 
