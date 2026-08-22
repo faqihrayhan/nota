@@ -31,7 +31,7 @@ export function buildAuthMessage({
   chainId,
 }: AuthMessageParams): string {
   const lines = [
-    `nota.arc.io wants you to sign in with your Ethereum account:`,
+    `${domain} wants you to sign in with your Ethereum account:`,
     address,
     ``,
     `Sign in to Nota (on-chain payment & receipt app).`,
@@ -67,7 +67,7 @@ export async function isValidSignature(
   }
 }
 
-/** Basic shape guard — messages must start with our domain prefix. */
+/** Basic shape guard — messages must follow the SIWE format prefix. */
 export function isOurAuthMessage(message: string): boolean {
-  return message.startsWith("nota.arc.io wants you to sign in");
+  return message.includes("wants you to sign in with your Ethereum account:");
 }
