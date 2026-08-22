@@ -357,7 +357,7 @@ export default function AnalisaPage() {
             </div>
           </div>
 
-          <ExportReport transactions={isConnected ? transactions : []} disabled={!isConnected} />
+          <ExportReport transactions={isConnected ? transactions : []} incoming={isConnected ? incoming : []} walletAddress={currentAddr} disabled={!isConnected} />
 
           <div className="rounded-2xl border border-ink-line/40 bg-ink p-6">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
