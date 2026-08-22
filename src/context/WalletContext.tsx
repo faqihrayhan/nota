@@ -116,7 +116,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (mmInitRef.current) return;
     mmInitRef.current = true;
 
-    const hostname = typeof window !== "undefined" ? window.location.host : "mynota-delta.vercel.app";
+    const hostname = typeof window !== "undefined" ? window.location.host : "nota.arc.io";
 
     const sdk = new MetaMaskSDK({
       dappMetadata: {
