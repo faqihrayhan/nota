@@ -130,6 +130,16 @@ export default function AnalisaPage() {
   const totalSpent = Object.values(byCategory).reduce((a, b) => a + b, 0);
   const maxCategory = Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0];
 
+  // Top OUTFLOW-only category (payer-side) — keeps the "% of outflow" insight
+  // truthful even when the By Category card is scoped to inflow/all.
+  const byCategoryOutflowOnly = filtered.reduce((acc, tx) => {
+    const cat = getEffectiveCategory(tx, currentAddr);
+    acc[cat] = (acc[cat] || 0) + tx.amount;
+    return acc;
+  }, { payment: 0, merchant_pos: 0, split_bill: 0, receive: 0 } as Record<FeatureCategory, number>);
+  const totalOutflowCategorized = Object.values(byCategoryOutflowOnly).reduce((a, b) => a + b, 0);
+  const maxOutflowCategory = Object.entries(byCategoryOutflowOnly).sort((a, b) => b[1] - a[1])[0];
+
   const byDay = filtered.reduce((acc, tx) => {
     const day = new Date(tx.created_at).toISOString().split("T")[0];
     acc[day] = (acc[day] || 0) + tx.amount;
@@ -290,8 +300,8 @@ export default function AnalisaPage() {
                     <span className="mt-0.5 text-warn-amber">●</span>
                     <span>
                       {t("analisa.insightTopCategory")}{" "}
-                      <strong className="capitalize">{maxCategory ? t(categoryLabelKey(maxCategory[0])) : "—"}</strong>{" "}
-                      ({maxCategory ? ((maxCategory[1] / Math.max(totalOutflow, 0.0001)) * 100).toFixed(0) : 0}%{" "}
+                      <strong className="capitalize">{maxOutflowCategory && totalOutflowCategorized > 0 ? t(categoryLabelKey(maxOutflowCategory[0])) : "—"}</strong>{" "}
+                      ({maxOutflowCategory && totalOutflowCategorized > 0 ? ((maxOutflowCategory[1] / Math.max(totalOutflow, 0.0001)) * 100).toFixed(0) : 0}%{" "}
                       {t("analisa.insightOfOutflow")})
                     </span>
                   </li>
