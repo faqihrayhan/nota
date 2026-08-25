@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { Reveal, TextReveal } from "@/components/Reveal";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -13,10 +12,18 @@ export function Hero() {
 
   return (
     <section id="top" className="relative min-h-[90vh] overflow-hidden flex items-center pt-16 pb-20">
-      {/* Background Gradients */}
+      {/* Background Gradients — static radial gradients (GPU-cheap vs blur filters) */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-accent/10 blur-[100px]" />
-        <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-purple-500/10 blur-[100px]" />
+        <div
+          className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px]"
+          style={{
+            background: "radial-gradient(circle closest-side, rgba(78,127,224,0.10), transparent)",
+          }}
+        />
+        <div
+          className="absolute top-[40%] -right-[10%] w-[500px] h-[500px]"
+          style={{ background: "radial-gradient(circle closest-side, rgba(168,85,247,0.08), transparent)" }}
+        />
       </div>
 
       <div className="mx-auto max-w-7xl px-6 w-full">
@@ -80,14 +87,10 @@ export function Hero() {
             </Reveal>
           </div>
 
-          {/* Right Column: PNG Receipt Image Hero */}
+          {/* Right Column: PNG Receipt Image Hero — static (no infinite animation, GPU-cheap) */}
           <div className="relative flex justify-center items-center mt-8 lg:mt-0">
             <div className="absolute -inset-4 bg-accent/10 rounded-full blur-3xl -z-10" />
-            <motion.div
-              animate={{ y: [0, -12, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              className="relative w-full max-w-[480px] drop-shadow-2xl"
-            >
+            <div className="relative w-full max-w-[480px] drop-shadow-2xl">
               <Image
                 src="/images/receipt-hero.svg"
                 alt={t("hero.receiptAlt")}
@@ -96,7 +99,7 @@ export function Hero() {
                 priority
                 className="w-full h-auto object-contain block"
               />
-            </motion.div>
+            </div>
           </div>
 
         </div>
