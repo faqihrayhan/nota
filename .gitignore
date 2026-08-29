@@ -67,3 +67,5 @@ README.md.backup
 **/supabase/.branches
 **/supabase/.temp
 supabase/volumes/
+# Supabase — dikelola Hann lokal, JANGAN pernah commit/push
+supabase/
