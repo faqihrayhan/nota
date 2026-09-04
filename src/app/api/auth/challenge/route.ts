@@ -10,6 +10,10 @@ import { createClient } from "@supabase/supabase-js";
  *
  * The client then builds the sign-in message, asks the wallet to sign it,
  * and exchanges (message, signature) for a JWT at /api/auth/wallet.
+ *
+ * Uses the SUPABASE_SERVICE_ROLE_KEY (server-only): `auth_nonces` has RLS
+ * enabled with no policies, so the anon key cannot read/insert/delete
+ * nonces. The service role bypasses RLS — these routes are the only writers.
  */
 
 const NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -33,7 +37,8 @@ export async function POST(req: NextRequest) {
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // Service-role key: auth_nonces is RLS deny-all for anon/authenticated.
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) {
       return NextResponse.json(
         { error: "supabase_not_configured" },
@@ -42,6 +47,13 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createClient(url, key);
+
+    // Best-effort housekeeping: purge expired nonces so the table stays small.
+    // Non-fatal — cleanup failures must not block issuing a fresh nonce.
+    await supabase
+      .from("auth_nonces")
+      .delete()
+      .lt("expires_at", new Date().toISOString());
 
     const nonce = generateNonce();
     const issuedAt = new Date().toISOString();

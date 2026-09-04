@@ -16,6 +16,9 @@ import { ARC_TESTNET_CHAIN_ID_DEC } from "@/lib/arc-chain";
  * 1. message must be one we issued (domain prefix + nonce that exists & unexpired)
  * 2. message must not have been used before (one-time nonce)
  * 3. signature must verify against the claimed address
+ *
+ * Uses the SUPABASE_SERVICE_ROLE_KEY (server-only): `auth_nonces` is RLS
+ * deny-all for client keys; only the service role may look up / burn nonces.
  */
 
 export async function POST(req: NextRequest) {
@@ -38,7 +41,8 @@ export async function POST(req: NextRequest) {
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // Service-role key: auth_nonces is RLS deny-all for anon/authenticated.
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) {
       return NextResponse.json(
         { error: "supabase_not_configured" },
