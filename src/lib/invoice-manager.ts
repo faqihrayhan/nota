@@ -30,6 +30,12 @@ export const SPLIT_EXPIRE_SIG = "0x6aa3e9b0";
 // splitCount() - view
 export const SPLIT_COUNT_SIG_V2 = "0x26825056";
 
+// getParticipantShare(uint256,address) - view
+export const SPLIT_GET_SHARE_SIG = "0xb8d3bcb4";
+
+// hasPaidShare(uint256,address) - view
+export const SPLIT_HAS_PAID_SIG = "0x9e421ade";
+
 // Minimal ABI (function signatures only - we encode calldata by hand).
 // createAndPayInvoice(address,uint256,bytes32) - one-shot create + pay.
 export const CREATE_AND_PAY_SIG = "0x2ebeb627";
@@ -191,6 +197,16 @@ export function encodeSplitBillPay(splitId: bigint | number): string {
 /** expireSplit(uint256 splitId) - permissionless post-deadline cleanup */
 export function encodeSplitBillExpire(splitId: bigint | number): string {
   return SPLIT_EXPIRE_SIG + encodeUint256(splitId);
+}
+
+/** getParticipantShare(uint256 splitId, address participant) - view query on-chain */
+export function encodeGetParticipantShare(splitId: bigint | number, participant: string): string {
+  return SPLIT_GET_SHARE_SIG + encodeUint256(splitId) + encodeAddress(participant);
+}
+
+/** hasPaidShare(uint256 splitId, address participant) - view query status on-chain */
+export function encodeHasPaidShare(splitId: bigint | number, participant: string): string {
+  return SPLIT_HAS_PAID_SIG + encodeUint256(splitId) + encodeAddress(participant);
 }
 
 /** paySplit(uint256 id) */

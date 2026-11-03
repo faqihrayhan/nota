@@ -391,5 +391,12 @@
   "export.totalAmount": "Total jumlah",
   "merchant.refreshCatalog": "Muat ulang katalog & sinkronkan stok",
   "splitBill.paymentDeadline": "Batas waktu pembayaran",
-  "splitBill.hoursPlaceholder": "jam"
+  "splitBill.hoursPlaceholder": "jam",
+  "splitBill.walletAddress": "Alamat Wallet",
+  "splitBill.walletAddressPlaceholder": "0x... alamat wallet EVM",
+  "splitBill.hostWalletAuto": "Host (Terkoneksi)",
+  "splitBill.invalidAddressError": "Mohon masukkan alamat EVM yang valid (0x...) untuk setiap peserta",
+  "splitBill.duplicateAddressError": "Ditemukan alamat wallet duplikat pada daftar peserta",
+  "payment.error.notParticipant": "Alamat wallet Anda tidak terdaftar sebagai peserta pada split bill ini.",
+  "payment.error.alreadyPaidSplit": "Bagian Anda untuk split bill ini sudah lunas."
 }

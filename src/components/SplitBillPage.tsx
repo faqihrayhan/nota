@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useWallet } from "@/context/WalletContext";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,11 @@ import { QRCodeSVG } from "qrcode.react";
 
 function generateNonce() {
   return Math.random().toString(36).substring(2, 15);
+}
+
+// Validasi format alamat EVM 42 karakter (0x...)
+function isValidEvmAddress(addr: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(addr.trim());
 }
 
 type EipProvider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
@@ -115,6 +120,7 @@ async function encodeQR(data: Record<string, unknown>): Promise<string> {
 interface Participant {
   id: string;
   name: string;
+  walletAddress: string;
   amount: number;
   paid: boolean;
 }
@@ -122,20 +128,29 @@ interface Participant {
 export function SplitBillPage() {
   const { t } = useLanguage();
   const { address, walletId } = useWallet();
-  const [totalAmount, setTotalAmount] = useState<string>("");
-  // deadline in hours from now; default 24 h
+  const [totalAmount, setTotalAmount] = useState<string>("" );
+  // Batas waktu pembayaran dalam jam; default 24 jam
   const [deadlineHours, setDeadlineHours] = useState<string>("24");
   const [participants, setParticipants] = useState<Participant[]>([
-    { id: "1", name: "You", amount: 0, paid: false }
+    { id: "1", name: "You", walletAddress: "", amount: 0, paid: false }
   ]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [splitId, setSplitId] = useState<number | null>(null);
 
+  // Sinkronkan alamat host dengan wallet aktif yang sedang terhubung
+  useEffect(() => {
+    if (address) {
+      setParticipants((prev) =>
+        prev.map((p, idx) => (idx === 0 ? { ...p, walletAddress: address.toLowerCase() } : p))
+      );
+    }
+  }, [address]);
+
   const addParticipant = () => {
     setParticipants([
       ...participants,
-      { id: Date.now().toString(), name: "", amount: 0, paid: false }
+      { id: Date.now().toString(), name: "", walletAddress: "", amount: 0, paid: false }
     ]);
   };
 
@@ -178,10 +193,32 @@ export function SplitBillPage() {
       const activeParticipants = participants.filter((p) => p.amount > 0 && p.name.trim().length > 0);
       if (activeParticipants.length === 0) throw new Error(t("splitBill.noParticipants"));
 
+      // 1. Validasi alamat EVM valid untuk seluruh peserta aktif
+      for (const p of activeParticipants) {
+        if (!isValidEvmAddress(p.walletAddress)) {
+          throw new Error(`${t("splitBill.invalidAddressError")} (${p.name || t("splitBill.participant")})`);
+        }
+      }
+
+      // 2. Validasi keunikan alamat wallet (revert DuplicateParticipant jika ada yang sama)
+      const participantAddresses = activeParticipants.map((p) => p.walletAddress.trim().toLowerCase());
+      const uniqueAddresses = new Set(participantAddresses);
+      if (uniqueAddresses.size !== participantAddresses.length) {
+        throw new Error(t("splitBill.duplicateAddressError"));
+      }
+
+      // 3. Hitung shares dalam satuan micro-USDC (6 desimal)
       const totalRaw = BigInt(Math.round(total * 1_000_000));
       const sharesRaw = activeParticipants.map((p) => BigInt(Math.round(p.amount * 1_000_000)));
 
-      // Deadline: N hours from now (Unix seconds)
+      // 4. Pastikan jumlah seluruh share sama persis dengan totalRaw (hindari rounding difference)
+      const sharesSum = sharesRaw.reduce((acc, curr) => acc + curr, BigInt(0));
+      if (sharesSum !== totalRaw) {
+        const diff = totalRaw - sharesSum;
+        sharesRaw[sharesRaw.length - 1] += diff;
+      }
+
+      // Batas waktu pembayaran (Unix seconds)
       const hours = Math.max(1, parseFloat(deadlineHours) || 24);
       const deadlineUnix = Math.floor(Date.now() / 1000) + Math.round(hours * 3600);
 
@@ -190,48 +227,23 @@ export function SplitBillPage() {
         type: "split_bill_v2",
         nonce,
         host: address.toLowerCase(),
-        participants: activeParticipants.map((p) => p.name.trim()),
+        participants: activeParticipants.map((p) => ({
+          name: p.name.trim(),
+          address: p.walletAddress.trim().toLowerCase(),
+          amount: p.amount,
+        })),
         total: totalRaw.toString(),
         deadline: deadlineUnix,
       }));
 
-      // NotaSplitBill.createSplit requires wallet addresses for each participant.
-      // Since we only have the host's address at creation time (names, not addresses),
-      // we create the split with the host address repeated for each participant slot.
-      // Each participant will scan the QR and call paySplit(splitId) from their own wallet,
-      // but their wallet address must match what was registered onchain.
-      // 
-      // For the QR flow, each participant gets an individual QR carrying their share amount.
-      // When they scan and pay, PaymentPage calls paySplit(splitId) on NotaSplitBill using
-      // SPLIT_BILL_ADDRESS as the target contract.
-      //
-      // For now, register the host as the single participant with the full amount,
-      // so the split is created and the QR is generated. Each payer (when they scan)
-      // will pay the host directly - see PaymentPage.handlePay split_bill path.
-      const participantAddresses = [address.toLowerCase()];
-      const participantSharesSingle = [totalRaw];
-
-      // Use createEqualSplit when all shares are equal and divisible; otherwise createSplit.
-      const allEqual = sharesRaw.every((s) => s === sharesRaw[0]);
-      const divisible = totalRaw % BigInt(1) === BigInt(0); // always true; real check is in contract
-      let calldata: string;
-      if (allEqual && divisible) {
-        calldata = encodeSplitBillCreate(
-          totalRaw,
-          participantAddresses,
-          participantSharesSingle,
-          deadlineUnix,
-          dataHash
-        );
-      } else {
-        calldata = encodeSplitBillCreate(
-          totalRaw,
-          participantAddresses,
-          participantSharesSingle,
-          deadlineUnix,
-          dataHash
-        );
-      }
+      // Calldata untuk smart contract NotaSplitBill (semua peserta & shares terdaftar resmi on-chain)
+      const calldata = encodeSplitBillCreate(
+        totalRaw,
+        participantAddresses,
+        sharesRaw,
+        deadlineUnix,
+        dataHash
+      );
 
       const txHash = (await provider.request({
         method: "eth_sendTransaction",
@@ -364,32 +376,59 @@ export function SplitBillPage() {
             </div>
             
             {participants.map((p, idx) => (
-              <div key={p.id} className="flex gap-3">
-                <input
-                  type="text"
-                  value={p.name}
-                  onChange={(e) => updateParticipant(p.id, { name: e.target.value })}
-                  placeholder={idx === 0 ? t("splitBill.you") : `${t("splitBill.participant")} ${idx + 1}`}
-                  className="flex-1 rounded-xl border border-ink-line/60 bg-ink/50 px-4 py-3 text-sm text-text outline-none focus:border-accent/50"
-                />
-                <div className="relative w-32">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-text-muted">$</span>
+              <div 
+                key={p.id} 
+                className="space-y-2 rounded-2xl border border-ink-line/60 bg-ink/40 p-3.5 transition-all focus-within:border-accent/40"
+              >
+                {/* Baris pertama: Nama peserta, Nominal share, dan tombol hapus */}
+                <div className="flex gap-2">
                   <input
-                    type="number"
-                    value={p.amount || ""}
-                    onChange={(e) => updateParticipant(p.id, { amount: parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
-                    className="w-full rounded-xl border border-ink-line/60 bg-ink/50 pl-7 pr-3 py-3 text-sm text-text outline-none focus:border-accent/50"
+                    type="text"
+                    value={p.name}
+                    onChange={(e) => updateParticipant(p.id, { name: e.target.value })}
+                    placeholder={idx === 0 ? t("splitBill.you") : `${t("splitBill.participant")} ${idx + 1}`}
+                    className="flex-1 rounded-xl border border-ink-line/60 bg-ink/50 px-3.5 py-2.5 text-sm text-text outline-none focus:border-accent/50"
                   />
+                  <div className="relative w-28 sm:w-32">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-text-muted">$</span>
+                    <input
+                      type="number"
+                      value={p.amount || ""}
+                      onChange={(e) => updateParticipant(p.id, { amount: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      className="w-full rounded-xl border border-ink-line/60 bg-ink/50 pl-7 pr-3 py-2.5 text-sm text-text outline-none focus:border-accent/50"
+                    />
+                  </div>
+                  {idx > 0 && (
+                    <button 
+                      onClick={() => removeParticipant(p.id)}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-warn-amber/20 bg-warn-amber/5 text-warn-amber transition-colors hover:bg-warn-amber/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-                {idx > 0 && (
-                  <button 
-                    onClick={() => removeParticipant(p.id)}
-                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-warn-amber/20 bg-warn-amber/5 text-warn-amber transition-colors hover:bg-warn-amber/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
+
+                {/* Baris kedua: Input alamat wallet EVM untuk registrasi on-chain */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={p.walletAddress}
+                    disabled={idx === 0 && !!address}
+                    onChange={(e) => updateParticipant(p.id, { walletAddress: e.target.value })}
+                    placeholder={idx === 0 ? (address || t("splitBill.walletAddressPlaceholder")) : t("splitBill.walletAddressPlaceholder")}
+                    className={cn(
+                      "flex-1 rounded-xl border border-ink-line/60 bg-ink/60 px-3.5 py-2 font-mono text-xs text-text outline-none transition-colors focus:border-accent/50",
+                      idx === 0 && "cursor-not-allowed opacity-80 bg-ink-2/60 text-text-muted",
+                      p.walletAddress && !isValidEvmAddress(p.walletAddress) && "border-warn-amber/60 text-warn-amber focus:border-warn-amber"
+                    )}
+                  />
+                  {idx === 0 && (
+                    <span className="shrink-0 rounded-lg border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent">
+                      {t("splitBill.hostWalletAuto")}
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
 
@@ -454,7 +493,7 @@ export function SplitBillPage() {
             <div className="text-center mb-4">
               <p className="text-2xl font-bold text-primary">{qrTotal.toFixed(2)} USDC</p>
               <p className="text-sm text-text-muted mt-1">
-                {participants.filter((p) => p.amount > 0).length} {t("splitBill.participantsShort")} · {t("splitBill.expiresIn")}
+                {participants.filter((p) => p.amount > 0).length} {t("splitBill.participantsShort")} · {deadlineHours} {t("splitBill.hoursPlaceholder")}
               </p>
             </div>
 

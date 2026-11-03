@@ -9,6 +9,8 @@ import {
   encodeCreateAndPayInvoice,
   encodePaySplit,
   encodeSplitBillPay,
+  encodeGetParticipantShare,
+  encodeHasPaidShare,
   encodeApprove,
   encodeAllowance,
   keccak256Hex,
@@ -221,7 +223,8 @@ const unsub = subscribeToTransactions(() => loadHistory());
       const { payload } = scannedData;
       const amountInUsdc = parseFloat(payload.totalAmount) / 1_000_000;
       const payeeAddress = payload.payerAddress.toLowerCase();
-      const amountRaw = BigInt(payload.totalAmount);
+      // Nominal awal dari payload QR (dapat disesuaikan jika split on-chain memiliki nominal berbeda)
+      let amountRaw = BigInt(payload.totalAmount);
 
       const existingTx = await findTransactionByNonce(payload.nonce);
       if (existingTx) {
@@ -241,15 +244,53 @@ const unsub = subscribeToTransactions(() => loadHistory());
         amount: amountRaw.toString(),
       }));
 
-      // 2. Choose payment path:
-      //    - split_bill_v2 + splitId → paySplit(splitId) on NotaSplitBill (new contract)
-      //    - split_bill    + splitId → paySplit(splitId) on old NotaInvoiceManager
-      //    - otherwise               → createAndPayInvoice (one-shot create + pay)
+      // 2. Tentukan alur transaksi contract:
+      //    - split_bill_v2 + splitId -> paySplit(splitId) pada NotaSplitBill (contract baru)
+      //    - split_bill    + splitId -> paySplit(splitId) pada NotaInvoiceManager (contract lama)
+      //    - lainnya                 -> createAndPayInvoice (one-shot create + pay)
       let calldata: string;
       let contractTarget: string;
       if (payload.category === "split_bill_v2" && typeof payload.splitId === "number" && payload.splitId > 0) {
         calldata = encodeSplitBillPay(payload.splitId);
         contractTarget = (payload as unknown as { contractAddress?: string }).contractAddress || SPLIT_BILL_ADDRESS;
+
+        // Validasi on-chain apakah wallet pembayar terdaftar di split bill
+        try {
+          const shareCalldata = encodeGetParticipantShare(payload.splitId, address);
+          const shareHex = (await provider.request({
+            method: "eth_call",
+            params: [{ to: contractTarget, data: shareCalldata }, "latest"],
+          })) as string;
+          const participantShare = BigInt(shareHex || "0x0");
+
+          if (participantShare === BigInt(0)) {
+            // Wallet bukan partisipan split bill terdaftar
+            throw new Error(t("payment.error.notParticipant"));
+          }
+
+          const hasPaidCalldata = encodeHasPaidShare(payload.splitId, address);
+          const hasPaidHex = (await provider.request({
+            method: "eth_call",
+            params: [{ to: contractTarget, data: hasPaidCalldata }, "latest"],
+          })) as string;
+          const hasPaid = BigInt(hasPaidHex || "0x0") !== BigInt(0);
+
+          if (hasPaid) {
+            // Bagian pembayar sudah pernah lunas
+            throw new Error(t("payment.error.alreadyPaidSplit"));
+          }
+
+          // Gunakan nominal presisi on-chain untuk alokasi approval USDC
+          amountRaw = participantShare;
+        } catch (checkErr) {
+          if (
+            (checkErr as Error).message === t("payment.error.notParticipant") ||
+            (checkErr as Error).message === t("payment.error.alreadyPaidSplit")
+          ) {
+            throw checkErr;
+          }
+          console.warn("Could not pre-verify split share on-chain:", checkErr);
+        }
       } else if (payload.category === "split_bill" && typeof payload.splitId === "number" && payload.splitId > 0) {
         calldata = encodePaySplit(payload.splitId);
         contractTarget = INVOICE_MANAGER_ADDRESS;

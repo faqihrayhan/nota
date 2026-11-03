@@ -391,5 +391,12 @@
   "export.totalAmount": "Total amount",
   "merchant.refreshCatalog": "Refresh catalog & sync stock",
   "splitBill.paymentDeadline": "Payment deadline",
-  "splitBill.hoursPlaceholder": "hrs"
+  "splitBill.hoursPlaceholder": "hrs",
+  "splitBill.walletAddress": "Wallet Address",
+  "splitBill.walletAddressPlaceholder": "0x... EVM wallet address",
+  "splitBill.hostWalletAuto": "Host (Connected)",
+  "splitBill.invalidAddressError": "Please provide a valid EVM address (0x...) for each participant",
+  "splitBill.duplicateAddressError": "Duplicate wallet address detected among participants",
+  "payment.error.notParticipant": "Your wallet address is not registered as a participant for this split bill.",
+  "payment.error.alreadyPaidSplit": "Your share for this split bill has already been paid."
 }
