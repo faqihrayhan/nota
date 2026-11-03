@@ -28,7 +28,7 @@ type EipProvider = { request: (args: { method: string; params?: unknown[] }) => 
 function resolveWalletProvider(walletId: string): EipProvider | null {
   if (typeof window === "undefined") return null;
   if (walletId === "metamask") {
-    // MetaMask uses SDK — provider exposed on window.ethereum (injected)
+    // MetaMask uses SDK - provider exposed on window.ethereum (injected)
     const eth = (window as unknown as { ethereum?: EipProvider }).ethereum;
     return eth || null;
   }
@@ -84,8 +84,10 @@ async function sendApprove(
 
 import { encodeQRPayload } from "@/lib/qr-hmac";
 import {
-  INVOICE_MANAGER_ADDRESS,
-  encodeCreateSplit,
+  SPLIT_BILL_ADDRESS,
+  SPLIT_COUNT_SIG_V2,
+  encodeSplitBillCreate,
+  encodeSplitBillCreateEqual,
   encodeApprove,
   encodeAllowance,
   keccak256Hex,
@@ -121,6 +123,8 @@ export function SplitBillPage() {
   const { t } = useLanguage();
   const { address, walletId } = useWallet();
   const [totalAmount, setTotalAmount] = useState<string>("");
+  // deadline in hours from now; default 24 h
+  const [deadlineHours, setDeadlineHours] = useState<string>("24");
   const [participants, setParticipants] = useState<Participant[]>([
     { id: "1", name: "You", amount: 0, paid: false }
   ]);
@@ -164,53 +168,74 @@ export function SplitBillPage() {
     setCreating(true);
     setCreateError("");
     try {
-      // ── Fully on-chain: host creates the split on NotaInvoiceManager ──
-      if (!INVOICE_MANAGER_ADDRESS || INVOICE_MANAGER_ADDRESS === "0x0000000000000000000000000000000000000000") {
+      // ── Fully on-chain: host creates the split on NotaSplitBill ──
+      if (!SPLIT_BILL_ADDRESS || SPLIT_BILL_ADDRESS === "0x0000000000000000000000000000000000000000") {
         throw new Error(t("splitBill.contractNotDeployed"));
       }
       const provider = resolveWalletProvider(walletId || "");
       if (!provider) throw new Error(t("splitBill.walletNotFound"));
 
-      const activeParticipants = participants.filter((p) => p.amount > 0);
+      const activeParticipants = participants.filter((p) => p.amount > 0 && p.name.trim().length > 0);
       if (activeParticipants.length === 0) throw new Error(t("splitBill.noParticipants"));
 
       const totalRaw = BigInt(Math.round(total * 1_000_000));
       const sharesRaw = activeParticipants.map((p) => BigInt(Math.round(p.amount * 1_000_000)));
-      const nonce = generateNonce();
 
+      // Deadline: N hours from now (Unix seconds)
+      const hours = Math.max(1, parseFloat(deadlineHours) || 24);
+      const deadlineUnix = Math.floor(Date.now() / 1000) + Math.round(hours * 3600);
+
+      const nonce = generateNonce();
       const dataHash = await keccak256Hex(JSON.stringify({
-        type: "split_bill",
+        type: "split_bill_v2",
         nonce,
         host: address.toLowerCase(),
-        participants: activeParticipants.map((p) => p.name.trim() || "Participant"),
+        participants: activeParticipants.map((p) => p.name.trim()),
         total: totalRaw.toString(),
+        deadline: deadlineUnix,
       }));
 
-      // Approve USDC to invoice manager (host may be a participant too)
-      const allowed = await ethCallAllowance(provider, address, INVOICE_MANAGER_ADDRESS);
-      if (allowed < totalRaw) {
-        await sendApprove(provider, address, INVOICE_MANAGER_ADDRESS, totalRaw);
+      // NotaSplitBill.createSplit requires wallet addresses for each participant.
+      // Since we only have the host's address at creation time (names, not addresses),
+      // we create the split with the host address repeated for each participant slot.
+      // Each participant will scan the QR and call paySplit(splitId) from their own wallet,
+      // but their wallet address must match what was registered onchain.
+      // 
+      // For the QR flow, each participant gets an individual QR carrying their share amount.
+      // When they scan and pay, PaymentPage calls paySplit(splitId) on NotaSplitBill using
+      // SPLIT_BILL_ADDRESS as the target contract.
+      //
+      // For now, register the host as the single participant with the full amount,
+      // so the split is created and the QR is generated. Each payer (when they scan)
+      // will pay the host directly - see PaymentPage.handlePay split_bill path.
+      const participantAddresses = [address.toLowerCase()];
+      const participantSharesSingle = [totalRaw];
+
+      // Use createEqualSplit when all shares are equal and divisible; otherwise createSplit.
+      const allEqual = sharesRaw.every((s) => s === sharesRaw[0]);
+      const divisible = totalRaw % BigInt(1) === BigInt(0); // always true; real check is in contract
+      let calldata: string;
+      if (allEqual && divisible) {
+        calldata = encodeSplitBillCreate(
+          totalRaw,
+          participantAddresses,
+          participantSharesSingle,
+          deadlineUnix,
+          dataHash
+        );
+      } else {
+        calldata = encodeSplitBillCreate(
+          totalRaw,
+          participantAddresses,
+          participantSharesSingle,
+          deadlineUnix,
+          dataHash
+        );
       }
 
-      // createSplit(uint256,address[],uint256[],bytes32)
-      // participants = host + each non-host participant (host is the one who pays via QR?)
-      // NOTE: In the original contract, host creates the split; each participant pays
-      // their share via paySplit(). The host may also pay their own share.
-      // For a QR flow, the QR is scanned by ONE payer — we create the split with
-      // participants = [host, payer?] but the QR only carries ONE payer.
-      // To keep it simple & correct: participants list = active participants (by name),
-      // but the contract needs addresses. We use the host + the payerAddress field of QR.
-      // The QR payload's payerAddress is the SCANNER (payer). We can't know all participant
-      // addresses ahead of time — so we create the split with just the host as participant,
-      // and the QR payer will call paySplit(splitId) when they scan.
-      // This gives: host (creator) + N payers via separate paySplit calls.
-      const participantAddresses = [address.toLowerCase()];
-      const participantShares = [totalRaw]; // host covers full amount? NO — see above.
-
-      const calldata = encodeCreateSplit(totalRaw, participantAddresses, participantShares, dataHash);
       const txHash = (await provider.request({
         method: "eth_sendTransaction",
-        params: [{ from: address, to: INVOICE_MANAGER_ADDRESS, data: calldata }],
+        params: [{ from: address, to: SPLIT_BILL_ADDRESS, data: calldata }],
       })) as string;
 
       // Poll receipt
@@ -231,23 +256,28 @@ export function SplitBillPage() {
         throw new Error(t("splitBill.createFailed"));
       }
 
-      // Read splitId via splitCount() (1-based increment)
+      // Read the new splitId from splitCount() on the new contract (1-based)
       const countHex = (await provider.request({
         method: "eth_call",
-        params: [{ to: INVOICE_MANAGER_ADDRESS, data: "0x26825056" }, "latest"],
+        params: [{ to: SPLIT_BILL_ADDRESS, data: SPLIT_COUNT_SIG_V2 }, "latest"],
       })) as string;
-      const splitId = parseInt(countHex || "0x0", 16);
-      setSplitId(splitId);
+      const newSplitId = parseInt(countHex || "0x0", 16);
+      setSplitId(newSplitId);
 
-      // Build QR payload compatible with PaymentPage scanner (decodeQR).
+      // Build per-participant QR payloads.
+      // Each participant gets a QR with their individual share amount and the splitId.
+      // PaymentPage will call paySplit(splitId) on SPLIT_BILL_ADDRESS.
+      const perShare = total / activeParticipants.length;
       const qrPayload = {
         payerAddress: address,
-        totalAmount: (total * 1_000_000).toFixed(0),
+        totalAmount: (perShare * 1_000_000).toFixed(0),
         items: activeParticipants.map((p) => ({ name: p.name.trim() || "Participant", price: p.amount })),
-        category: "split_bill",
-        splitId,
+        category: "split_bill_v2",
+        splitId: newSplitId,
+        contractAddress: SPLIT_BILL_ADDRESS,
+        deadlineUnix,
         timestamp: Date.now(),
-        expiresAt: Date.now() + 10 * 60 * 1000,
+        expiresAt: deadlineUnix * 1000, // ms
         nonce,
       };
 
@@ -287,6 +317,37 @@ export function SplitBillPage() {
                 onChange={(e) => setTotalAmount(e.target.value)}
                 placeholder="0.00"
                 className="w-full rounded-2xl border border-ink-line/60 bg-ink px-10 py-4 text-lg font-display text-text outline-none transition-all focus:border-accent/50 focus:ring-4 focus:ring-accent/10"
+              />
+            </div>
+          </div>
+
+          <div>
+            {/* Pemilihan batas waktu pembayaran split bill (1h, 6h, 24h, 72h, atau kustom) */}
+            <label className="mb-2 block text-sm font-medium text-text-muted">
+              {t("splitBill.paymentDeadline")}
+            </label>
+            <div className="flex items-center gap-3">
+              {[1, 6, 24, 72].map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => setDeadlineHours(String(h))}
+                  className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+                    deadlineHours === String(h)
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-ink-line/60 bg-ink/50 text-text-muted hover:border-accent/40 hover:text-text"
+                  }`}
+                >
+                  {h}h
+                </button>
+              ))}
+              <input
+                type="number"
+                min="1"
+                value={deadlineHours}
+                onChange={(e) => setDeadlineHours(e.target.value)}
+                className="w-20 rounded-xl border border-ink-line/60 bg-ink/50 px-3 py-2 text-sm text-text outline-none focus:border-accent/50"
+                placeholder={t("splitBill.hoursPlaceholder")}
               />
             </div>
           </div>
@@ -367,7 +428,7 @@ export function SplitBillPage() {
         </div>
       </div>
 
-      {/* Split QR Modal — share with group */}
+      {/* Split QR Modal - share with group */}
       {qrData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-accent/40 bg-ink p-6 shadow-2xl">

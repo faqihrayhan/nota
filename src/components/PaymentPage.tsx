@@ -5,8 +5,10 @@ import { useWallet } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   INVOICE_MANAGER_ADDRESS,
+  SPLIT_BILL_ADDRESS,
   encodeCreateAndPayInvoice,
   encodePaySplit,
+  encodeSplitBillPay,
   encodeApprove,
   encodeAllowance,
   keccak256Hex,
@@ -239,22 +241,29 @@ const unsub = subscribeToTransactions(() => loadHistory());
         amount: amountRaw.toString(),
       }));
 
-      // 1. Approve USDC to invoice manager if needed
-      await ensureAllowance(provider, address, INVOICE_MANAGER_ADDRESS, amountRaw);
-
       // 2. Choose payment path:
-      //    - split_bill + splitId → paySplit(splitId) on-chain (participant settles share)
-      //    - otherwise → createAndPayInvoice (one-shot create + pay)
+      //    - split_bill_v2 + splitId → paySplit(splitId) on NotaSplitBill (new contract)
+      //    - split_bill    + splitId → paySplit(splitId) on old NotaInvoiceManager
+      //    - otherwise               → createAndPayInvoice (one-shot create + pay)
       let calldata: string;
-      if (payload.category === "split_bill" && typeof payload.splitId === "number" && payload.splitId > 0) {
+      let contractTarget: string;
+      if (payload.category === "split_bill_v2" && typeof payload.splitId === "number" && payload.splitId > 0) {
+        calldata = encodeSplitBillPay(payload.splitId);
+        contractTarget = (payload as unknown as { contractAddress?: string }).contractAddress || SPLIT_BILL_ADDRESS;
+      } else if (payload.category === "split_bill" && typeof payload.splitId === "number" && payload.splitId > 0) {
         calldata = encodePaySplit(payload.splitId);
+        contractTarget = INVOICE_MANAGER_ADDRESS;
       } else {
         calldata = encodeCreateAndPayInvoice(payeeAddress, amountRaw, dataHash);
+        contractTarget = INVOICE_MANAGER_ADDRESS;
       }
+
+      // 2a. Ensure USDC allowance for the target contract
+      await ensureAllowance(provider, address, contractTarget, amountRaw);
 
       const txHash = (await provider.request({
         method: "eth_sendTransaction",
-        params: [{ from: address, to: INVOICE_MANAGER_ADDRESS, data: calldata }],
+        params: [{ from: address, to: contractTarget, data: calldata }],
       })) as string;
 
       // Poll for receipt: check via provider, with fallback to direct RPC call if provider fails (e.g. rate limit)
@@ -315,7 +324,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
 
       await saveTransaction(tx);
       // Stock deduction is ONLY for merchant POS. Split-bill payments are
-      // settled fully on-chain via paySplit — they must NOT deduct merchant stock.
+      // settled fully on-chain via paySplit - they must NOT deduct merchant stock.
       const isMerchantPos = payload.category !== "split_bill";
       if (isMerchantPos) {
         // Stock deduction now happens server-side (service-role) so merchant
@@ -499,7 +508,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
           </div>
         </div>
       ) : (
-        /* Scan QR section — rectangle card, camera-first (mobile-first) */
+        /* Scan QR section - rectangle card, camera-first (mobile-first) */
         <div className="rounded-2xl border border-ink-line/40 bg-ink-2/30 p-6">
           <div className="flex items-center gap-2 text-accent">
             <ScanLine className="h-5 w-5" />
@@ -507,7 +516,7 @@ const unsub = subscribeToTransactions(() => loadHistory());
           </div>
           <p className="mt-1 text-xs text-text-muted">Point your camera at a payment QR code, or paste the QR data below.</p>
 
-          {/* Camera / scan area — rectangle block */}
+          {/* Camera / scan area - rectangle block */}
           <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-ink-line/50 bg-ink/40 px-4 py-10">
             <Camera className="h-8 w-8 text-accent" />
             <button
