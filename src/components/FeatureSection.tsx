@@ -35,7 +35,7 @@ const PILARS = [
     bgColor: "bg-cyan-400/10",
     borderColor: "border-cyan-400/20",
     href: "/merchant",
-    active: true,
+    active: false, // Akses Merchant POS ditutup sementara (Coming Soon)
   },
   {
     id: "pilar3",

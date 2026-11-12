@@ -46,13 +46,20 @@ export function Nav() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const featureItems = [
+  // Daftar fitur navigasi Nota
+  const featureItems: Array<{
+    icon: React.ComponentType<{ className?: string }>;
+    title: string;
+    desc: string;
+    href: string;
+    tag?: string;
+  }> = [
     { icon: CreditCard, title: t("nav.payment"), desc: "Scan & Pay", href: "/payment" },
-    { icon: Store, title: t("nav.merchant"), desc: "Manage Your Merchant",href: "/merchant" },
+    { icon: Store, title: t("nav.merchant"), desc: "Temporarily Closed", href: "/merchant", tag: "Closed" }, // Akses Merchant POS ditutup sementara
     { icon: BarChart3, title: t("nav.analisa"), desc: "Financial Analysis", href: "/analisa" },
     { icon: TrendingUp, title: t("nav.forecast"), desc: "AI Forecasting", href: "/forecast" },
-    { icon: Layers, title: t("nav.split-bill") , desc: "Split Your Payment", href: "/split-bill" },
-    { icon: HelpCircle, title: t("nav.score"), desc: "Coming Soon", href: "/score" },
+    { icon: Layers, title: t("nav.split-bill"), desc: "Split Your Payment", href: "/split-bill" },
+    { icon: HelpCircle, title: t("nav.score"), desc: "Coming Soon", href: "/score", tag: "Soon" },
   ];
 
   const docsItems = [
@@ -116,7 +123,15 @@ export function Nav() {
                       <item.icon className="h-4 w-4" />
                     </div>
                     <div className="flex-1">
-                      <span className="text-sm font-medium text-text">{item.title}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-text">{item.title}</span>
+                        {item.tag && (
+                          <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                            {item.tag}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-text-muted">{item.desc}</p>
                     </div>
                     <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:text-text-muted" />
                   </Link>
@@ -189,9 +204,16 @@ export function Nav() {
           <div className="pt-2">
             <p className="px-4 py-2 text-[11px] font-mono uppercase tracking-wider text-text-faint">{t("nav.features")}</p>
             {featureItems.map((item) => (
-              <Link key={item.title} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-white/[0.03] rounded-xl transition-all duration-200">
-                <item.icon className="h-4 w-4 text-text-faint" />
-                <span>{item.title}</span>
+              <Link key={item.title} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center justify-between px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-white/[0.03] rounded-xl transition-all duration-200">
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-4 w-4 text-text-faint" />
+                  <span>{item.title}</span>
+                </div>
+                {item.tag && (
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                    {item.tag}
+                  </span>
+                )}
               </Link>
             ))}
           </div>
